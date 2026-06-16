@@ -1,3 +1,7 @@
+//! Gmail user profile (`users.getProfile`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users/getProfile>
+
 use core::fmt;
 
 use alloc::{format, string::String};

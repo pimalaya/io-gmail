@@ -1,3 +1,7 @@
+//! Std-blocking Gmail client: wraps a `Read + Write` stream plus the
+//! bearer credential and drives the coroutines against
+//! `gmail.googleapis.com`. Gated behind the `client` feature.
+
 #[cfg(any(
     feature = "rustls-aws",
     feature = "rustls-ring",

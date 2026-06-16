@@ -1,3 +1,8 @@
+//! Gmail messages (`users.messages`), including attachments
+//! (`users.messages.attachments`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.messages>
+
 mod types;
 #[doc(inline)]
 pub use types::*;

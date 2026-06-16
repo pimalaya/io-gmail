@@ -17,6 +17,8 @@ pub struct GmailThreadSummary {
 pub struct GmailThread {
     pub id: String,
     #[serde(default)]
+    pub snippet: Option<String>,
+    #[serde(default)]
     pub history_id: Option<String>,
     #[serde(default)]
     pub messages: Vec<crate::messages::GmailMessage>,

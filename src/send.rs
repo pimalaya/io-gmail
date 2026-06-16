@@ -1,3 +1,9 @@
+//! HTTP/JSON transport every Gmail coroutine delegates to: builds the
+//! authorized request and parses the JSON response, or the Gmail error
+//! envelope on failure.
+//!
+//! Gmail API reference: <https://developers.google.com/gmail/api/reference/rest>.
+
 use core::{fmt, marker::PhantomData};
 
 use alloc::{

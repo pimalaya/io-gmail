@@ -1,3 +1,7 @@
+//! Coroutine driver: the `GmailCoroutine` trait, its `GmailYield` /
+//! `GmailCoroutineState`, and the `gmail_try!` macro (the coroutine
+//! equivalent of `?`).
+
 use alloc::vec::Vec;
 
 #[derive(Debug)]

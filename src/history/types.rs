@@ -2,14 +2,14 @@ use alloc::{string::String, vec::Vec};
 
 use serde::{Deserialize, Serialize};
 
-use crate::messages::GmailMessageId;
+use crate::messages::GmailMessage;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailHistory {
     pub id: String,
     #[serde(default)]
-    pub messages: Vec<GmailMessageId>,
+    pub messages: Vec<GmailMessage>,
     #[serde(default)]
     pub messages_added: Vec<GmailHistoryMessage>,
     #[serde(default)]
@@ -23,13 +23,13 @@ pub struct GmailHistory {
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailHistoryMessage {
-    pub message: GmailMessageId,
+    pub message: GmailMessage,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailHistoryLabel {
-    pub message: GmailMessageId,
+    pub message: GmailMessage,
     #[serde(default)]
     pub label_ids: Vec<String>,
 }

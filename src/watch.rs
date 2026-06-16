@@ -1,3 +1,9 @@
+//! Infinite polling watch coroutine: baseline via `users.getProfile`,
+//! then poll `users.history.list` on a timer (yielding `WantsSleep`) and
+//! emit one raw `GmailHistoryDiff` per tick.
+//!
+//! Gmail sync guide: <https://developers.google.com/gmail/api/guides/sync>
+
 use core::{convert::Infallible, fmt, mem, time::Duration};
 
 use alloc::{string::String, vec::Vec};
@@ -179,7 +185,10 @@ impl GmailCoroutine for GmailWatch {
                                 cycle.added_ids.push(message.message.id.clone());
                             }
                             for message in &record.messages_deleted {
-                                cycle.removed.push(message.message.clone());
+                                cycle.removed.push(GmailMessageId {
+                                    id: message.message.id.clone(),
+                                    thread_id: message.message.thread_id.clone(),
+                                });
                             }
                             for label in &record.labels_added {
                                 cycle.labels_added.push(label.clone());

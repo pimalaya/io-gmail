@@ -18,6 +18,21 @@ pub struct GmailLabel {
     pub messages_total: Option<u64>,
     #[serde(default)]
     pub messages_unread: Option<u64>,
+    #[serde(default)]
+    pub threads_total: Option<u64>,
+    #[serde(default)]
+    pub threads_unread: Option<u64>,
+    #[serde(default)]
+    pub color: Option<GmailLabelColor>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GmailLabelColor {
+    #[serde(default)]
+    pub text_color: Option<String>,
+    #[serde(default)]
+    pub background_color: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]

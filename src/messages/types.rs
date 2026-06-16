@@ -36,6 +36,8 @@ pub struct GmailMessage {
 #[serde(rename_all = "camelCase")]
 pub struct GmailMessagePayload {
     #[serde(default)]
+    pub part_id: Option<String>,
+    #[serde(default)]
     pub mime_type: Option<String>,
     #[serde(default)]
     pub body: Option<GmailMessagePartBody>,
