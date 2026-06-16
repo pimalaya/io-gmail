@@ -1,9 +1,11 @@
 //! List the Gmail delegates (`users.settings.delegates.list`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.delegates/list>
 
 use alloc::{format, vec::Vec};
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -29,13 +31,13 @@ pub struct GmailDelegatesList {
 }
 
 impl GmailDelegatesList {
-    pub fn new(http_auth: &SecretString, user_id: &str) -> Result<Self, GmailSendError> {
+    pub fn new(auth: &HttpAuthBearer, user_id: &str) -> Result<Self, GmailSendError> {
         debug!("prepare gmail delegates listing");
         trace!("user_id: {user_id:?}");
 
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/delegates"))?;
-        let send = GmailSend::get(http_auth, url);
+        let send = GmailSend::get(auth, url);
 
         Ok(Self { send })
     }

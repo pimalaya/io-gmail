@@ -12,12 +12,12 @@ use io_gmail::v1::{
     },
     send::{GmailSendError, parse_api_error},
 };
-use secrecy::SecretString;
+use io_http::rfc6750::bearer::HttpAuthBearer;
 
-use common::{drive, empty_response, json_response};
+use common::{empty_response, json_response, run};
 
-fn auth() -> SecretString {
-    SecretString::from("Bearer fake-token".to_string())
+fn auth() -> HttpAuthBearer {
+    HttpAuthBearer::new("fake-token")
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn gets_profile() {
         r#"{"emailAddress":"me@example.com","messagesTotal":12,"threadsTotal":8}"#,
     );
     let mut coroutine = GmailProfileGet::new(&auth(), "me").unwrap();
-    let (ret, _) = drive(&mut coroutine, &response);
+    let (ret, _) = run(&mut coroutine, &response);
     let out = ret.unwrap();
 
     assert_eq!(out.response.email_address, "me@example.com");
@@ -41,7 +41,7 @@ fn lists_labels() {
         r#"{"labels":[{"id":"INBOX","name":"INBOX","type":"system"}]}"#,
     );
     let mut coroutine = GmailLabelsList::new(&auth(), "me").unwrap();
-    let (ret, _) = drive(&mut coroutine, &response);
+    let (ret, _) = run(&mut coroutine, &response);
     let out = ret.unwrap();
 
     assert_eq!(out.response.labels.len(), 1);
@@ -61,7 +61,7 @@ fn creates_label_with_visibilities() {
         ..Default::default()
     };
     let mut coroutine = GmailLabelCreate::new(&auth(), "me", &label).unwrap();
-    let (ret, written) = drive(&mut coroutine, &response);
+    let (ret, written) = run(&mut coroutine, &response);
 
     assert_eq!(ret.unwrap().response.id, "Label_1");
 
@@ -98,7 +98,7 @@ fn updates_label_with_patch() {
         ..Default::default()
     };
     let mut coroutine = GmailLabelPatch::new(&auth(), "me", &label).unwrap();
-    let (ret, written) = drive(&mut coroutine, &response);
+    let (ret, written) = run(&mut coroutine, &response);
 
     assert_eq!(ret.unwrap().response.name, "renamed");
 
@@ -113,7 +113,7 @@ fn updates_label_with_patch() {
 fn deletes_label() {
     let response = empty_response("HTTP/1.1 204 No Content");
     let mut coroutine = GmailLabelDelete::new(&auth(), "me", "Label_1").unwrap();
-    let (ret, written) = drive(&mut coroutine, &response);
+    let (ret, written) = run(&mut coroutine, &response);
 
     ret.unwrap();
 
@@ -131,7 +131,7 @@ fn surfaces_api_errors() {
         r#"{"error":{"code":403,"message":"insufficient permissions"}}"#,
     );
     let mut coroutine = GmailLabelsList::new(&auth(), "me").unwrap();
-    let (ret, _) = drive(&mut coroutine, &response);
+    let (ret, _) = run(&mut coroutine, &response);
 
     match ret.unwrap_err() {
         GmailSendError::Api { status, message } => {

@@ -1,9 +1,11 @@
 //! Batch-modify Gmail message labels (`users.messages.batchModify`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.messages/batchModify>
 
 use alloc::{format, string::String};
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use serde::Serialize;
 use url::Url;
 
@@ -28,7 +30,7 @@ pub struct GmailMessageBatchModify {
 
 impl GmailMessageBatchModify {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         ids: &[String],
         add_label_ids: &[String],
@@ -46,7 +48,7 @@ impl GmailMessageBatchModify {
             add_label_ids,
             remove_label_ids,
         };
-        let send = GmailSend::post_json(http_auth, url, &body)?;
+        let send = GmailSend::post_json(auth, url, &body)?;
 
         Ok(Self { send })
     }

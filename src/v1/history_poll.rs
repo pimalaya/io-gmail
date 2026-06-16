@@ -8,8 +8,8 @@ use core::{convert::Infallible, fmt, mem, time::Duration};
 
 use alloc::{string::String, vec::Vec};
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::trace;
-use secrecy::SecretString;
 use thiserror::Error;
 
 use crate::{
@@ -50,7 +50,7 @@ pub enum GmailHistoryPollYield {
 
 pub struct GmailHistoryPoll {
     state: State,
-    http_auth: SecretString,
+    auth: HttpAuthBearer,
     user_id: String,
     mailbox: String,
     history_id: Option<String>,
@@ -58,15 +58,15 @@ pub struct GmailHistoryPoll {
 
 impl GmailHistoryPoll {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         mailbox: &str,
     ) -> Result<Self, GmailHistoryPollError> {
         trace!("prepare Gmail history poll");
-        let profile = GmailProfileGet::new(http_auth, user_id)?;
+        let profile = GmailProfileGet::new(auth, user_id)?;
         Ok(Self {
             state: State::Baseline(profile),
-            http_auth: http_auth.clone(),
+            auth: auth.clone(),
             user_id: user_id.into(),
             mailbox: mailbox.into(),
             history_id: None,
@@ -81,12 +81,12 @@ impl GmailHistoryPoll {
             max_results: None,
             page_token,
         };
-        GmailHistoryList::new(&self.http_auth, &self.user_id, &params)
+        GmailHistoryList::new(&self.auth, &self.user_id, &params)
     }
 
     fn message_get(&self, id: &str) -> Result<GmailMessageGet, GmailSendError> {
         GmailMessageGet::new(
-            &self.http_auth,
+            &self.auth,
             &self.user_id,
             id,
             GmailMessageFormat::Metadata,
@@ -169,8 +169,7 @@ impl GmailCoroutine for GmailHistoryPoll {
                     GmailCoroutineState::Complete(Err(err)) => {
                         if err.status() == Some(404) {
                             trace!("gmail history cursor expired; re-baselining");
-                            let profile = match GmailProfileGet::new(&self.http_auth, &self.user_id)
-                            {
+                            let profile = match GmailProfileGet::new(&self.auth, &self.user_id) {
                                 Ok(profile) => profile,
                                 Err(err) => {
                                     return GmailCoroutineState::Complete(Err(err.into()));

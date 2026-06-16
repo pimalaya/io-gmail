@@ -1,9 +1,11 @@
 //! Delete a Gmail delegate (`users.settings.delegates.delete`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.delegates/delete>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -18,7 +20,7 @@ pub struct GmailDelegateDelete {
 
 impl GmailDelegateDelete {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         delegate_email: &str,
     ) -> Result<Self, GmailSendError> {
@@ -28,7 +30,7 @@ impl GmailDelegateDelete {
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
             "users/{user_id}/settings/delegates/{delegate_email}"
         ))?;
-        let send = GmailSend::delete(http_auth, url);
+        let send = GmailSend::delete(auth, url);
 
         Ok(Self { send })
     }

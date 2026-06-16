@@ -1,9 +1,11 @@
 //! Untrash a Gmail thread (`users.threads.untrash`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.threads/untrash>
 
 use alloc::{format, vec::Vec};
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -19,13 +21,13 @@ pub struct GmailThreadUntrash {
 }
 
 impl GmailThreadUntrash {
-    pub fn new(http_auth: &SecretString, user_id: &str, id: &str) -> Result<Self, GmailSendError> {
+    pub fn new(auth: &HttpAuthBearer, user_id: &str, id: &str) -> Result<Self, GmailSendError> {
         debug!("prepare gmail thread untrashing");
         trace!("id: {id:?}");
 
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/threads/{id}/untrash"))?;
-        let send = GmailSend::with_method(http_auth, "POST", url, None, Vec::new());
+        let send = GmailSend::with_method(auth, "POST", url, None, Vec::new());
 
         Ok(Self { send })
     }

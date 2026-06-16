@@ -1,4 +1,6 @@
 //! Gmail user-level resource types (profile, watch).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users>
 
 use alloc::{string::String, vec::Vec};
 

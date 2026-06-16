@@ -1,5 +1,5 @@
 //! Std-blocking Gmail client: wraps a `Read + Write` stream plus the
-//! bearer credential and drives the coroutines against
+//! bearer credential and runs the coroutines against
 //! `gmail.googleapis.com`. Gated behind the `client` feature.
 
 #[cfg(any(
@@ -17,6 +17,7 @@ use core::{any::Any, fmt};
 ))]
 use alloc::string::ToString;
 use alloc::{boxed::Box, string::String};
+use io_http::rfc6750::bearer::HttpAuthBearer;
 
 use std::io::{self, Read, Write};
 
@@ -25,8 +26,13 @@ use std::io::{self, Read, Write};
     feature = "rustls-ring",
     feature = "native-tls"
 ))]
-use pimalaya_stream::{std::stream::StreamStd, tls::Tls};
-use secrecy::SecretString;
+use pimalaya_stream::std::stream::StreamStd;
+#[cfg(any(
+    feature = "rustls-aws",
+    feature = "rustls-ring",
+    feature = "native-tls"
+))]
+pub use pimalaya_stream::tls::*;
 use thiserror::Error;
 #[cfg(any(
     feature = "rustls-aws",
@@ -35,6 +41,12 @@ use thiserror::Error;
 ))]
 use url::Url;
 
+#[cfg(any(
+    feature = "rustls-aws",
+    feature = "rustls-ring",
+    feature = "native-tls"
+))]
+use crate::v1::send::GMAIL_API_BASE;
 use crate::{
     coroutine::*,
     v1::rest::labels::{
@@ -86,24 +98,50 @@ pub enum GmailClientStdError {
     UrlUnsupportedScheme(String, String),
 }
 
+/// Optional settings for [`GmailClientStd::connect`]; every field has a
+/// default (the TLS backend default, and `me` as the mailbox owner).
+pub struct GmailClientStdConnectOptions {
+    #[cfg(any(
+        feature = "rustls-aws",
+        feature = "rustls-ring",
+        feature = "native-tls"
+    ))]
+    pub tls: Tls,
+    pub user_id: String,
+}
+
+impl Default for GmailClientStdConnectOptions {
+    fn default() -> Self {
+        Self {
+            #[cfg(any(
+                feature = "rustls-aws",
+                feature = "rustls-ring",
+                feature = "native-tls"
+            ))]
+            tls: Tls::default(),
+            user_id: String::from("me"),
+        }
+    }
+}
+
 const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 pub struct GmailClientStd {
     pub stream: Box<dyn GmailStream>,
-    pub http_auth: SecretString,
+    pub auth: HttpAuthBearer,
     pub user_id: String,
 }
 
 impl GmailClientStd {
     pub fn new<S: Read + Write + Send + 'static>(
         stream: S,
-        http_auth: SecretString,
-        user_id: impl Into<String>,
+        token: impl ToString,
+        options: GmailClientStdConnectOptions,
     ) -> Self {
         Self {
             stream: Box::new(stream),
-            http_auth,
-            user_id: user_id.into(),
+            auth: HttpAuthBearer::new(token.to_string()),
+            user_id: options.user_id,
         }
     }
 
@@ -113,18 +151,19 @@ impl GmailClientStd {
         feature = "native-tls"
     ))]
     pub fn connect(
-        url: &Url,
-        tls: &Tls,
-        http_auth: SecretString,
-        user_id: impl Into<String>,
+        token: impl ToString,
+        options: GmailClientStdConnectOptions,
     ) -> Result<Self, GmailClientStdError> {
+        let GmailClientStdConnectOptions { tls, user_id } = options;
+
+        let url = Url::parse(GMAIL_API_BASE).expect("Gmail API base URL is valid");
         let host = url
             .host_str()
             .ok_or_else(|| GmailClientStdError::UrlMissingHost(url.to_string()))?;
 
         let stream = match url.scheme() {
             "http" => StreamStd::connect_tcp(host, url.port().unwrap_or(80))?,
-            "https" => StreamStd::connect_tls(host, url.port().unwrap_or(443), tls)?,
+            "https" => StreamStd::connect_tls(host, url.port().unwrap_or(443), &tls)?,
             scheme => {
                 return Err(GmailClientStdError::UrlUnsupportedScheme(
                     url.to_string(),
@@ -137,8 +176,8 @@ impl GmailClientStd {
 
         Ok(Self {
             stream: Box::new(stream),
-            http_auth,
-            user_id: user_id.into(),
+            auth: HttpAuthBearer::new(token.to_string()),
+            user_id,
         })
     }
 
@@ -170,7 +209,7 @@ impl GmailClientStd {
     }
 
     pub fn profile_get(&mut self) -> Result<GmailSendOutput<GmailProfile>, GmailClientStdError> {
-        let coroutine = GmailProfileGet::new(&self.http_auth, &self.user_id)?;
+        let coroutine = GmailProfileGet::new(&self.auth, &self.user_id)?;
         self.run(coroutine)
     }
 
@@ -178,19 +217,19 @@ impl GmailClientStd {
         &mut self,
         request: &GmailWatchRequest,
     ) -> Result<GmailSendOutput<GmailWatchResponse>, GmailClientStdError> {
-        let coroutine = GmailWatch::new(&self.http_auth, &self.user_id, request)?;
+        let coroutine = GmailWatch::new(&self.auth, &self.user_id, request)?;
         self.run(coroutine)
     }
 
     pub fn stop(&mut self) -> Result<GmailSendOutput<GmailNoResponse>, GmailClientStdError> {
-        let coroutine = GmailStop::new(&self.http_auth, &self.user_id)?;
+        let coroutine = GmailStop::new(&self.auth, &self.user_id)?;
         self.run(coroutine)
     }
 
     pub fn labels_list(
         &mut self,
     ) -> Result<GmailSendOutput<GmailLabelsListResponse>, GmailClientStdError> {
-        let coroutine = GmailLabelsList::new(&self.http_auth, &self.user_id)?;
+        let coroutine = GmailLabelsList::new(&self.auth, &self.user_id)?;
         self.run(coroutine)
     }
 
@@ -198,7 +237,7 @@ impl GmailClientStd {
         &mut self,
         id: &str,
     ) -> Result<GmailSendOutput<GmailLabel>, GmailClientStdError> {
-        let coroutine = GmailLabelGet::new(&self.http_auth, &self.user_id, id)?;
+        let coroutine = GmailLabelGet::new(&self.auth, &self.user_id, id)?;
         self.run(coroutine)
     }
 
@@ -206,7 +245,7 @@ impl GmailClientStd {
         &mut self,
         label: &GmailLabel,
     ) -> Result<GmailSendOutput<GmailLabel>, GmailClientStdError> {
-        let coroutine = GmailLabelCreate::new(&self.http_auth, &self.user_id, label)?;
+        let coroutine = GmailLabelCreate::new(&self.auth, &self.user_id, label)?;
         self.run(coroutine)
     }
 
@@ -214,7 +253,7 @@ impl GmailClientStd {
         &mut self,
         label: &GmailLabel,
     ) -> Result<GmailSendOutput<GmailLabel>, GmailClientStdError> {
-        let coroutine = GmailLabelUpdate::new(&self.http_auth, &self.user_id, label)?;
+        let coroutine = GmailLabelUpdate::new(&self.auth, &self.user_id, label)?;
         self.run(coroutine)
     }
 
@@ -222,7 +261,7 @@ impl GmailClientStd {
         &mut self,
         label: &GmailLabel,
     ) -> Result<GmailSendOutput<GmailLabel>, GmailClientStdError> {
-        let coroutine = GmailLabelPatch::new(&self.http_auth, &self.user_id, label)?;
+        let coroutine = GmailLabelPatch::new(&self.auth, &self.user_id, label)?;
         self.run(coroutine)
     }
 
@@ -230,7 +269,7 @@ impl GmailClientStd {
         &mut self,
         id: &str,
     ) -> Result<GmailSendOutput<GmailNoResponse>, GmailClientStdError> {
-        let coroutine = GmailLabelDelete::new(&self.http_auth, &self.user_id, id)?;
+        let coroutine = GmailLabelDelete::new(&self.auth, &self.user_id, id)?;
         self.run(coroutine)
     }
 
@@ -238,7 +277,7 @@ impl GmailClientStd {
         &mut self,
         params: &GmailMessagesListParams,
     ) -> Result<GmailSendOutput<GmailMessagesListResponse>, GmailClientStdError> {
-        let coroutine = GmailMessagesList::new(&self.http_auth, &self.user_id, params)?;
+        let coroutine = GmailMessagesList::new(&self.auth, &self.user_id, params)?;
         self.run(coroutine)
     }
 
@@ -249,7 +288,7 @@ impl GmailClientStd {
         metadata_headers: &[&str],
     ) -> Result<GmailSendOutput<GmailMessage>, GmailClientStdError> {
         let coroutine =
-            GmailMessageGet::new(&self.http_auth, &self.user_id, id, format, metadata_headers)?;
+            GmailMessageGet::new(&self.auth, &self.user_id, id, format, metadata_headers)?;
         self.run(coroutine)
     }
 
@@ -257,7 +296,7 @@ impl GmailClientStd {
         &mut self,
         message: &GmailMessage,
     ) -> Result<GmailSendOutput<GmailMessageId>, GmailClientStdError> {
-        let coroutine = GmailMessageSend::new(&self.http_auth, &self.user_id, message)?;
+        let coroutine = GmailMessageSend::new(&self.auth, &self.user_id, message)?;
         self.run(coroutine)
     }
 
@@ -268,7 +307,7 @@ impl GmailClientStd {
         remove_label_ids: &[String],
     ) -> Result<GmailSendOutput<GmailMessage>, GmailClientStdError> {
         let coroutine = GmailMessageModify::new(
-            &self.http_auth,
+            &self.auth,
             &self.user_id,
             id,
             add_label_ids,
@@ -281,7 +320,7 @@ impl GmailClientStd {
         &mut self,
         id: &str,
     ) -> Result<GmailSendOutput<GmailMessage>, GmailClientStdError> {
-        let coroutine = GmailMessageTrash::new(&self.http_auth, &self.user_id, id)?;
+        let coroutine = GmailMessageTrash::new(&self.auth, &self.user_id, id)?;
         self.run(coroutine)
     }
 
@@ -289,7 +328,7 @@ impl GmailClientStd {
         &mut self,
         id: &str,
     ) -> Result<GmailSendOutput<GmailMessage>, GmailClientStdError> {
-        let coroutine = GmailMessageUntrash::new(&self.http_auth, &self.user_id, id)?;
+        let coroutine = GmailMessageUntrash::new(&self.auth, &self.user_id, id)?;
         self.run(coroutine)
     }
 
@@ -297,7 +336,7 @@ impl GmailClientStd {
         &mut self,
         id: &str,
     ) -> Result<GmailSendOutput<GmailNoResponse>, GmailClientStdError> {
-        let coroutine = GmailMessageDelete::new(&self.http_auth, &self.user_id, id)?;
+        let coroutine = GmailMessageDelete::new(&self.auth, &self.user_id, id)?;
         self.run(coroutine)
     }
 }
@@ -305,7 +344,7 @@ impl GmailClientStd {
 impl fmt::Debug for GmailClientStd {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("GmailClientStd")
-            .field("http_auth", &self.http_auth)
+            .field("auth", &self.auth)
             .field("user_id", &self.user_id)
             .finish_non_exhaustive()
     }

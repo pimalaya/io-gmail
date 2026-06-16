@@ -13,6 +13,7 @@ use alloc::{
 
 use io_http::{
     coroutine::{HttpCoroutine, HttpCoroutineState},
+    rfc6750::bearer::HttpAuthBearer,
     rfc9110::{
         request::HttpRequest,
         send::{HttpSendOutput, HttpSendYield},
@@ -20,7 +21,6 @@ use io_http::{
     rfc9112::send::{Http11Send, Http11SendError},
 };
 use log::trace;
-use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use thiserror::Error;
 use url::Url;
@@ -86,22 +86,22 @@ pub struct GmailSend<T> {
 }
 
 impl<T: DeserializeOwned> GmailSend<T> {
-    pub fn get(http_auth: &SecretString, url: Url) -> Self {
-        Self::with_method(http_auth, "GET", url, None, Vec::new())
+    pub fn get(auth: &HttpAuthBearer, url: Url) -> Self {
+        Self::with_method(auth, "GET", url, None, Vec::new())
     }
 
-    pub fn delete(http_auth: &SecretString, url: Url) -> Self {
-        Self::with_method(http_auth, "DELETE", url, None, Vec::new())
+    pub fn delete(auth: &HttpAuthBearer, url: Url) -> Self {
+        Self::with_method(auth, "DELETE", url, None, Vec::new())
     }
 
     pub fn post_json<B: Serialize>(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         url: Url,
         body: &B,
     ) -> Result<Self, GmailSendError> {
         let body = serde_json::to_vec(body).map_err(GmailSendError::SerializeRequest)?;
         Ok(Self::with_method(
-            http_auth,
+            auth,
             "POST",
             url,
             Some("application/json"),
@@ -110,13 +110,13 @@ impl<T: DeserializeOwned> GmailSend<T> {
     }
 
     pub fn put_json<B: Serialize>(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         url: Url,
         body: &B,
     ) -> Result<Self, GmailSendError> {
         let body = serde_json::to_vec(body).map_err(GmailSendError::SerializeRequest)?;
         Ok(Self::with_method(
-            http_auth,
+            auth,
             "PUT",
             url,
             Some("application/json"),
@@ -125,13 +125,13 @@ impl<T: DeserializeOwned> GmailSend<T> {
     }
 
     pub fn patch_json<B: Serialize>(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         url: Url,
         body: &B,
     ) -> Result<Self, GmailSendError> {
         let body = serde_json::to_vec(body).map_err(GmailSendError::SerializeRequest)?;
         Ok(Self::with_method(
-            http_auth,
+            auth,
             "PATCH",
             url,
             Some("application/json"),
@@ -140,7 +140,7 @@ impl<T: DeserializeOwned> GmailSend<T> {
     }
 
     pub fn with_method(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         method: &str,
         url: Url,
         content_type: Option<&str>,
@@ -151,7 +151,7 @@ impl<T: DeserializeOwned> GmailSend<T> {
         let mut request = HttpRequest::get(url.clone())
             .header("Host", host)
             .header("Accept", "application/json")
-            .header("Authorization", http_auth.expose_secret())
+            .header("Authorization", auth.to_authorization())
             .body(body);
 
         if let Some(content_type) = content_type {

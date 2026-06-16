@@ -470,7 +470,6 @@ dependencies = [
  "io-http",
  "log",
  "pimalaya-stream",
- "secrecy",
  "serde",
  "serde_json",
  "serde_variant",

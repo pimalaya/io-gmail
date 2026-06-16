@@ -1,10 +1,12 @@
 //! Create a Gmail forwarding address
 //! (`users.settings.forwardingAddresses.create`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.forwardingAddresses/create>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -22,7 +24,7 @@ pub struct GmailForwardingAddressCreate {
 
 impl GmailForwardingAddressCreate {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         address: &GmailForwardingAddress,
     ) -> Result<Self, GmailSendError> {
@@ -31,7 +33,7 @@ impl GmailForwardingAddressCreate {
 
         let url = Url::parse(GMAIL_API_BASE)?
             .join(&format!("users/{user_id}/settings/forwardingAddresses"))?;
-        let send = GmailSend::post_json(http_auth, url, address)?;
+        let send = GmailSend::post_json(auth, url, address)?;
 
         Ok(Self { send })
     }

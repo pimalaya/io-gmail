@@ -1,9 +1,11 @@
 //! List the Gmail history records (`users.history.list`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.history/list>
 
 use alloc::{format, string::String, vec::Vec};
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -46,7 +48,7 @@ pub struct GmailHistoryList {
 
 impl GmailHistoryList {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         params: &GmailHistoryListParams,
     ) -> Result<Self, GmailSendError> {
@@ -56,7 +58,7 @@ impl GmailHistoryList {
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/history"))?;
         url.query_pairs_mut().extend_pairs(to_query_pairs(params));
 
-        let send = GmailSend::get(http_auth, url);
+        let send = GmailSend::get(auth, url);
 
         Ok(Self { send })
     }

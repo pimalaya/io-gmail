@@ -1,9 +1,11 @@
 //! Get a Gmail message attachment (`users.messages.attachments.get`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.messages.attachments/get>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -20,7 +22,7 @@ pub struct GmailAttachmentGet {
 
 impl GmailAttachmentGet {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         message_id: &str,
         id: &str,
@@ -32,7 +34,7 @@ impl GmailAttachmentGet {
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
             "users/{user_id}/messages/{message_id}/attachments/{id}"
         ))?;
-        let send = GmailSend::get(http_auth, url);
+        let send = GmailSend::get(auth, url);
 
         Ok(Self { send })
     }

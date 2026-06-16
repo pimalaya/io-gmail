@@ -1,9 +1,11 @@
 //! List the Gmail send-as aliases (`users.settings.sendAs.list`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.sendAs/list>
 
 use alloc::{format, vec::Vec};
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -29,12 +31,12 @@ pub struct GmailSendAsList {
 }
 
 impl GmailSendAsList {
-    pub fn new(http_auth: &SecretString, user_id: &str) -> Result<Self, GmailSendError> {
+    pub fn new(auth: &HttpAuthBearer, user_id: &str) -> Result<Self, GmailSendError> {
         debug!("prepare gmail send-as aliases listing");
         trace!("user_id: {user_id:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/sendAs"))?;
-        let send = GmailSend::get(http_auth, url);
+        let send = GmailSend::get(auth, url);
 
         Ok(Self { send })
     }

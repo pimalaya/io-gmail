@@ -1,9 +1,11 @@
 //! Verify a Gmail send-as alias (`users.settings.sendAs.verify`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.sendAs/verify>
 
 use alloc::{format, vec::Vec};
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -18,7 +20,7 @@ pub struct GmailSendAsVerify {
 
 impl GmailSendAsVerify {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         send_as_email: &str,
     ) -> Result<Self, GmailSendError> {
@@ -28,7 +30,7 @@ impl GmailSendAsVerify {
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
             "users/{user_id}/settings/sendAs/{send_as_email}/verify"
         ))?;
-        let send = GmailSend::with_method(http_auth, "POST", url, None, Vec::new());
+        let send = GmailSend::with_method(auth, "POST", url, None, Vec::new());
 
         Ok(Self { send })
     }

@@ -1,4 +1,6 @@
 //! Gmail forwarding-address resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.forwardingAddresses>
 
 use alloc::string::String;
 

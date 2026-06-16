@@ -1,9 +1,11 @@
 //! Create a Gmail filter (`users.settings.filters.create`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.filters/create>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -21,7 +23,7 @@ pub struct GmailFilterCreate {
 
 impl GmailFilterCreate {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         filter: &GmailFilter,
     ) -> Result<Self, GmailSendError> {
@@ -29,7 +31,7 @@ impl GmailFilterCreate {
         trace!("filter: {filter:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/filters"))?;
-        let send = GmailSend::post_json(http_auth, url, filter)?;
+        let send = GmailSend::post_json(auth, url, filter)?;
 
         Ok(Self { send })
     }

@@ -20,16 +20,13 @@ use std::{
 };
 
 use io_gmail::v1::{
-    client::GmailClientStd,
+    client::{GmailClientStd, GmailClientStdConnectOptions},
     rest::{
         labels::GmailLabel,
         messages::{GmailMessage, GmailMessageFormat, encode_raw, list::GmailMessagesListParams},
     },
-    send::GMAIL_API_BASE,
 };
 use pimalaya_stream::tls::Tls;
-use secrecy::SecretString;
-use url::Url;
 
 #[test]
 #[ignore = "requires GMAIL_ACCESS_TOKEN env var and --include-ignored"]
@@ -38,13 +35,12 @@ fn gmail() {
 
     let token = env::var("GMAIL_ACCESS_TOKEN").expect("GMAIL_ACCESS_TOKEN not set");
     let user_id = env::var("GMAIL_USER_ID").unwrap_or_else(|_| "me".to_owned());
-    let http_auth = SecretString::from(format!("Bearer {token}"));
 
-    let url = Url::parse(GMAIL_API_BASE).expect("parse Gmail API base URL");
-    let tls = Tls::default();
-
-    let mut client =
-        GmailClientStd::connect(&url, &tls, http_auth.clone(), user_id.clone()).expect("connect");
+    let options = GmailClientStdConnectOptions {
+        tls: Tls::default(),
+        user_id: user_id.clone(),
+    };
+    let mut client = GmailClientStd::connect(token.clone(), options).expect("connect");
 
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)

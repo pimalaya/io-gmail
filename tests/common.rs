@@ -2,7 +2,7 @@
 
 use io_gmail::coroutine::*;
 
-pub fn drive<C: GmailCoroutine<Yield = GmailYield>>(
+pub fn run<C: GmailCoroutine<Yield = GmailYield>>(
     coroutine: &mut C,
     response: &[u8],
 ) -> (C::Return, Vec<u8>) {

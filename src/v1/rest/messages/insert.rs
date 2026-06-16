@@ -1,9 +1,11 @@
 //! Insert a Gmail message (`users.messages.insert`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.messages/insert>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use serde_variant::to_variant_name;
 use url::Url;
 
@@ -21,7 +23,7 @@ pub struct GmailMessageInsert {
 
 impl GmailMessageInsert {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         message: &GmailMessage,
         internal_date_source: Option<GmailInternalDateSource>,
@@ -47,7 +49,7 @@ impl GmailMessageInsert {
             }
         }
 
-        let send = GmailSend::post_json(http_auth, url, message)?;
+        let send = GmailSend::post_json(auth, url, message)?;
 
         Ok(Self { send })
     }

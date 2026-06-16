@@ -1,4 +1,6 @@
 //! Gmail draft resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.drafts>
 
 use alloc::string::String;
 

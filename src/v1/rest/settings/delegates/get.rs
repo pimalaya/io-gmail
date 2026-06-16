@@ -1,9 +1,11 @@
 //! Get a Gmail delegate (`users.settings.delegates.get`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.delegates/get>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -21,7 +23,7 @@ pub struct GmailDelegateGet {
 
 impl GmailDelegateGet {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         delegate_email: &str,
     ) -> Result<Self, GmailSendError> {
@@ -31,7 +33,7 @@ impl GmailDelegateGet {
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
             "users/{user_id}/settings/delegates/{delegate_email}"
         ))?;
-        let send = GmailSend::get(http_auth, url);
+        let send = GmailSend::get(auth, url);
 
         Ok(Self { send })
     }

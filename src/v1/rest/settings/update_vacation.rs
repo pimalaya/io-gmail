@@ -1,9 +1,11 @@
 //! Update the Gmail vacation settings (`users.settings.updateVacation`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings/updateVacation>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -21,7 +23,7 @@ pub struct GmailVacationUpdate {
 
 impl GmailVacationUpdate {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         settings: GmailVacationSettings,
     ) -> Result<Self, GmailSendError> {
@@ -30,7 +32,7 @@ impl GmailVacationUpdate {
 
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/vacation"))?;
-        let send = GmailSend::put_json(http_auth, url, &settings)?;
+        let send = GmailSend::put_json(auth, url, &settings)?;
 
         Ok(Self { send })
     }

@@ -1,9 +1,11 @@
 //! Delete a Gmail label (`users.labels.delete`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.labels/delete>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -17,12 +19,12 @@ pub struct GmailLabelDelete {
 }
 
 impl GmailLabelDelete {
-    pub fn new(http_auth: &SecretString, user_id: &str, id: &str) -> Result<Self, GmailSendError> {
+    pub fn new(auth: &HttpAuthBearer, user_id: &str, id: &str) -> Result<Self, GmailSendError> {
         debug!("prepare gmail label deletion");
         trace!("id: {id:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/labels/{id}"))?;
-        let send = GmailSend::delete(http_auth, url);
+        let send = GmailSend::delete(auth, url);
 
         Ok(Self { send })
     }

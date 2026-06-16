@@ -1,9 +1,11 @@
 //! Create a Gmail send-as alias (`users.settings.sendAs.create`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.sendAs/create>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -21,7 +23,7 @@ pub struct GmailSendAsCreate {
 
 impl GmailSendAsCreate {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         send_as: &GmailSendAs,
     ) -> Result<Self, GmailSendError> {
@@ -29,7 +31,7 @@ impl GmailSendAsCreate {
         trace!("send_as: {send_as:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/sendAs"))?;
-        let send = GmailSend::post_json(http_auth, url, send_as)?;
+        let send = GmailSend::post_json(auth, url, send_as)?;
 
         Ok(Self { send })
     }

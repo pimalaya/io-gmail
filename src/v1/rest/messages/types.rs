@@ -1,4 +1,6 @@
 //! Gmail message resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.messages>
 
 use alloc::{string::String, vec::Vec};
 

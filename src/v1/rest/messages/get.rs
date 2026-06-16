@@ -1,9 +1,11 @@
 //! Get a Gmail message (`users.messages.get`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.messages/get>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use serde_variant::to_variant_name;
 use url::Url;
 
@@ -21,7 +23,7 @@ pub struct GmailMessageGet {
 
 impl GmailMessageGet {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         id: &str,
         format: GmailMessageFormat,
@@ -44,7 +46,7 @@ impl GmailMessageGet {
             }
         }
 
-        let send = GmailSend::get(http_auth, url);
+        let send = GmailSend::get(auth, url);
 
         Ok(Self { send })
     }

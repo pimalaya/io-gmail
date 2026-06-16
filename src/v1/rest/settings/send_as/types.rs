@@ -1,4 +1,6 @@
 //! Gmail send-as resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.sendAs>
 
 use alloc::string::String;
 

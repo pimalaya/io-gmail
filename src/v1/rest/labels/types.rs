@@ -1,4 +1,6 @@
 //! Gmail label resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.labels>
 
 use alloc::{string::String, vec::Vec};
 

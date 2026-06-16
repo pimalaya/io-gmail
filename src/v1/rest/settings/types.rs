@@ -1,4 +1,6 @@
 //! Gmail settings resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings>
 
 use alloc::string::String;
 

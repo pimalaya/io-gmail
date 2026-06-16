@@ -1,9 +1,11 @@
 //! Patch a Gmail label (`users.labels.patch`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.labels/patch>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -21,7 +23,7 @@ pub struct GmailLabelPatch {
 
 impl GmailLabelPatch {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         label: &GmailLabel,
     ) -> Result<Self, GmailSendError> {
@@ -30,7 +32,7 @@ impl GmailLabelPatch {
 
         let id = &label.id;
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/labels/{id}"))?;
-        let send = GmailSend::patch_json(http_auth, url, label)?;
+        let send = GmailSend::patch_json(auth, url, label)?;
 
         Ok(Self { send })
     }

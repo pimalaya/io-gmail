@@ -1,4 +1,6 @@
 //! Gmail delegate resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.delegates>
 
 use alloc::string::String;
 

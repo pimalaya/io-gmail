@@ -1,9 +1,11 @@
 //! Patch a Gmail send-as alias (`users.settings.sendAs.patch`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.sendAs/patch>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -21,7 +23,7 @@ pub struct GmailSendAsPatch {
 
 impl GmailSendAsPatch {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         send_as_email: &str,
         send_as: &GmailSendAs,
@@ -31,7 +33,7 @@ impl GmailSendAsPatch {
 
         let url = Url::parse(GMAIL_API_BASE)?
             .join(&format!("users/{user_id}/settings/sendAs/{send_as_email}"))?;
-        let send = GmailSend::patch_json(http_auth, url, send_as)?;
+        let send = GmailSend::patch_json(auth, url, send_as)?;
 
         Ok(Self { send })
     }

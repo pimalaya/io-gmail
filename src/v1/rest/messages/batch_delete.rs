@@ -1,9 +1,11 @@
 //! Batch-delete Gmail messages (`users.messages.batchDelete`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.messages/batchDelete>
 
 use alloc::{format, string::String};
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use serde::Serialize;
 use url::Url;
 
@@ -25,7 +27,7 @@ pub struct GmailMessageBatchDelete {
 
 impl GmailMessageBatchDelete {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         ids: &[String],
     ) -> Result<Self, GmailSendError> {
@@ -35,7 +37,7 @@ impl GmailMessageBatchDelete {
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/batchDelete"))?;
         let body = GmailMessageBatchDeleteRequest { ids };
-        let send = GmailSend::post_json(http_auth, url, &body)?;
+        let send = GmailSend::post_json(auth, url, &body)?;
 
         Ok(Self { send })
     }

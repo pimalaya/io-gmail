@@ -1,4 +1,6 @@
 //! Gmail filter resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.filters>
 
 use alloc::{string::String, vec::Vec};
 

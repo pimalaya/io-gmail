@@ -1,9 +1,11 @@
 //! Get the Gmail auto-forwarding settings (`users.settings.getAutoForwarding`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings/getAutoForwarding>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -20,13 +22,13 @@ pub struct GmailAutoForwardingGet {
 }
 
 impl GmailAutoForwardingGet {
-    pub fn new(http_auth: &SecretString, user_id: &str) -> Result<Self, GmailSendError> {
+    pub fn new(auth: &HttpAuthBearer, user_id: &str) -> Result<Self, GmailSendError> {
         debug!("prepare gmail auto-forwarding settings retrieval");
         trace!("user_id: {user_id:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?
             .join(&format!("users/{user_id}/settings/autoForwarding"))?;
-        let send = GmailSend::get(http_auth, url);
+        let send = GmailSend::get(auth, url);
 
         Ok(Self { send })
     }

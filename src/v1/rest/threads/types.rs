@@ -1,4 +1,6 @@
 //! Gmail thread resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.threads>
 
 use alloc::{string::String, vec::Vec};
 

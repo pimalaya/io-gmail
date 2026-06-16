@@ -1,4 +1,6 @@
 //! Gmail history resource types.
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.history>
 
 use alloc::{string::String, vec::Vec};
 

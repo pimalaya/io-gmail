@@ -1,9 +1,11 @@
 //! Update a Gmail draft (`users.drafts.update`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.drafts/update>
 
 use alloc::format;
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use url::Url;
 
 use crate::{
@@ -22,7 +24,7 @@ pub struct GmailDraftUpdate {
 
 impl GmailDraftUpdate {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         draft: &GmailDraft,
     ) -> Result<Self, GmailSendError> {
@@ -32,7 +34,7 @@ impl GmailDraftUpdate {
         let id = &draft.id;
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/drafts/{id}"))?;
-        let send = GmailSend::put_json(http_auth, url, draft)?;
+        let send = GmailSend::put_json(auth, url, draft)?;
 
         Ok(Self { send })
     }

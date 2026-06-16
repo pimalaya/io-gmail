@@ -1,9 +1,11 @@
 //! List the Gmail threads (`users.threads.list`).
+//!
+//! <https://developers.google.com/gmail/api/reference/rest/v1/users.threads/list>
 
 use alloc::{format, string::String, vec::Vec};
 
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -48,7 +50,7 @@ pub struct GmailThreadsList {
 
 impl GmailThreadsList {
     pub fn new(
-        http_auth: &SecretString,
+        auth: &HttpAuthBearer,
         user_id: &str,
         params: &GmailThreadsListParams,
     ) -> Result<Self, GmailSendError> {
@@ -58,7 +60,7 @@ impl GmailThreadsList {
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/threads"))?;
         url.query_pairs_mut().extend_pairs(to_query_pairs(params));
 
-        let send = GmailSend::get(http_auth, url);
+        let send = GmailSend::get(auth, url);
 
         Ok(Self { send })
     }
