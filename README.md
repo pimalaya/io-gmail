@@ -33,10 +33,10 @@ io-gmail = "0.0.1" # rustls-ring is enabled by default
 ```rust,no_run
 use io_gmail::v1::client::GmailClientStd;
 
-let mut client = GmailClientStd::connect("<token>", Default::default()).unwrap();
+let mut client = GmailClientStd::connect("token", Default::default()).unwrap();
 
 let out = client.profile_get().unwrap();
-println!("Email address: {}", out.response.profile.email_address);
+println!("Email address: {}", out.response.email_address);
 
 let out = client.labels_list().unwrap();
 for label in &out.response.labels {
@@ -70,10 +70,10 @@ let tcp = TcpStream::connect(("gmail.googleapis.com", 443)).unwrap();
 let stream = StreamOwned::new(conn, tcp);
 
 // Standard, blocking client
-let mut client = GmailClientStd::new(stream, "<token>", Default::default());
+let mut client = GmailClientStd::new(stream, "token", Default::default());
 
 let out = client.profile_get().unwrap();
-println!("Email address: {}", out.response.profile.email_address);
+println!("Email address: {}", out.response.email_address);
 
 let out = client.labels_list().unwrap();
 for label in &out.response.labels {
@@ -97,10 +97,8 @@ tokio-rustls = "0.26"
 ```rust,no_run
 use std::sync::Arc;
 
-use io_gmail::{
-    coroutine::*,
-    v1::{rest::users::get_profile::GmailProfileGet, send::GmailSendOutput},
-};
+use io_gmail::{coroutine::*, v1::rest::users::get_profile::GmailProfileGet};
+use io_http::rfc6750::bearer::HttpAuthBearer;
 use rustls::ClientConfig;
 use rustls_platform_verifier::ConfigVerifierExt;
 use tokio::{
@@ -109,41 +107,43 @@ use tokio::{
 };
 use tokio_rustls::TlsConnector;
 
-let http_auth = SecretString::from("Bearer your-token-here");
+#[tokio::main]
+async fn main() {
+    // Async TLS connection
+    let config = ClientConfig::with_platform_verifier().unwrap();
+    let connector = TlsConnector::from(Arc::new(config));
+    let server_name = "gmail.googleapis.com".try_into().unwrap();
+    let tcp = TcpStream::connect(("gmail.googleapis.com", 443)).await.unwrap();
+    let mut stream = connector.connect(server_name, tcp).await.unwrap();
 
-// Async TLS connection
-let config = ClientConfig::with_platform_verifier().unwrap();
-let connector = TlsConnector::from(Arc::new(config));
-let server_name = "gmail.googleapis.com".try_into().unwrap();
-let tcp = TcpStream::connect(("gmail.googleapis.com", 443)).await.unwrap();
-let mut stream = connector.connect(server_name, tcp).await.unwrap();
+    // Run the I/O-free coroutine against the async stream
+    let auth = HttpAuthBearer::new("token");
+    let mut coroutine = GmailProfileGet::new(&auth, "me").unwrap();
+    let mut arg: Option<&[u8]> = None;
+    let mut buf = [0u8; 8192];
+    let mut read_buf = Vec::<u8>::new();
 
-// Drive the I/O-free coroutine against the async stream
-let mut coroutine = GmailProfileGet::new(&http_auth, "me").unwrap();
-let mut arg: Option<&[u8]> = None;
-let mut buf = [0u8; 8192];
-let mut read_buf = Vec::<u8>::new();
-
-let out = loop {
-    match coroutine.resume(arg.take()) {
-        GmailCoroutineState::Complete(Ok(out)) => break out,
-        GmailCoroutineState::Yielded(GmailYield::WantsRead) => {
-            let n = stream.read(&mut buf).await.unwrap();
-            read_buf.clear();
-            read_buf.extend_from_slice(&buf[..n]);
-            arg = Some(&read_buf);
+    let out = loop {
+        match coroutine.resume(arg.take()) {
+            GmailCoroutineState::Complete(Ok(out)) => break out,
+            GmailCoroutineState::Yielded(GmailYield::WantsRead) => {
+                let n = stream.read(&mut buf).await.unwrap();
+                read_buf.clear();
+                read_buf.extend_from_slice(&buf[..n]);
+                arg = Some(&read_buf);
+            }
+            GmailCoroutineState::Yielded(GmailYield::WantsWrite(bytes)) => {
+                stream.write_all(&bytes).await.unwrap();
+            }
+            GmailCoroutineState::Complete(Err(err)) => panic!("{err}"),
         }
-        GmailCoroutineState::Yielded(GmailYield::WantsWrite(bytes)) => {
-            stream.write_all(&bytes).await.unwrap();
-        }
-        GmailCoroutineState::Complete(Err(err)) => panic!("{err}"),
-    }
-};
+    };
 
-println!("Email address: {}", out.response.profile.email_address);
+    println!("Email address: {}", out.response.email_address);
+}
 ```
 
-> [!INFO]
+> [!IMPORTANT]
 > For such advanced usage, it is preferable to read the [architecture guide](ARCHITECTURE.md).
 
 ## Examples

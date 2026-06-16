@@ -1,5 +1,6 @@
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![no_std]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![doc = include_str!("../README.md")]
 
 //! I/O-free coroutines for the Gmail REST API.
 //!

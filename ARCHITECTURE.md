@@ -1,4 +1,4 @@
-# io-gmail architecture
+# Architecture guide
 
 Read the [Pimalaya ARCHITECTURE](https://github.com/pimalaya/.github/blob/master/ARCHITECTURE.md) first: it describes the conventions every Pimalaya repository shares (the sans-I/O coroutine approach, `no_std`, module and error rules, code style, licensing). This document only covers what is specific to io-gmail, and assumes you know that shared context.
 
