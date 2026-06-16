@@ -1,3 +1,5 @@
+//! Update a Gmail send-as alias (`users.settings.sendAs.update`).
+
 use alloc::format;
 
 use log::{debug, trace};

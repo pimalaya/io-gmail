@@ -1,3 +1,5 @@
+//! Get a Gmail filter (`users.settings.filters.get`).
+
 use alloc::format;
 
 use log::{debug, trace};

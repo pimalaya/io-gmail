@@ -1,3 +1,5 @@
+//! Batch-delete Gmail messages (`users.messages.batchDelete`).
+
 use alloc::{format, string::String};
 
 use log::{debug, trace};

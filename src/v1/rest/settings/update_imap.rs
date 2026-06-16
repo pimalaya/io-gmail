@@ -1,3 +1,5 @@
+//! Update the Gmail IMAP settings (`users.settings.updateImap`).
+
 use alloc::format;
 
 use log::{debug, trace};

@@ -1,3 +1,5 @@
+//! Modify Gmail thread labels (`users.threads.modify`).
+
 use alloc::{format, string::String};
 
 use log::{debug, trace};

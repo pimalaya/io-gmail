@@ -1,3 +1,6 @@
+//! List the Gmail forwarding addresses
+//! (`users.settings.forwardingAddresses.list`).
+
 use alloc::{format, vec::Vec};
 
 use log::{debug, trace};

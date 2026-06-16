@@ -1,3 +1,5 @@
+//! Update the Gmail POP settings (`users.settings.updatePop`).
+
 use alloc::format;
 
 use log::{debug, trace};

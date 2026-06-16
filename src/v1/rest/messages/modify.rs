@@ -1,3 +1,5 @@
+//! Modify Gmail message labels (`users.messages.modify`).
+
 use alloc::{format, string::String};
 
 use log::{debug, trace};

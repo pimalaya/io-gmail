@@ -1,3 +1,5 @@
+//! List the Gmail threads (`users.threads.list`).
+
 use alloc::{
     format,
     string::{String, ToString},

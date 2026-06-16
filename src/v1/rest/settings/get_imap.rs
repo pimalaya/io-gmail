@@ -1,3 +1,5 @@
+//! Get the Gmail IMAP settings (`users.settings.getImap`).
+
 use alloc::format;
 
 use log::{debug, trace};

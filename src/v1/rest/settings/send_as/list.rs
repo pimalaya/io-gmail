@@ -1,3 +1,5 @@
+//! List the Gmail send-as aliases (`users.settings.sendAs.list`).
+
 use alloc::{format, vec::Vec};
 
 use log::{debug, trace};

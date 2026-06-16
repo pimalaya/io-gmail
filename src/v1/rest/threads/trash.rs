@@ -1,3 +1,5 @@
+//! Trash a Gmail thread (`users.threads.trash`).
+
 use alloc::{format, vec::Vec};
 
 use log::{debug, trace};

@@ -1,3 +1,5 @@
+//! Create a Gmail label (`users.labels.create`).
+
 use alloc::format;
 
 use log::{debug, trace};

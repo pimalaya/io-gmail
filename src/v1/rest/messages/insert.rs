@@ -1,3 +1,5 @@
+//! Insert a Gmail message (`users.messages.insert`).
+
 use alloc::format;
 
 use log::{debug, trace};

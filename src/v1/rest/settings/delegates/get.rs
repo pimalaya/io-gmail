@@ -1,3 +1,5 @@
+//! Get a Gmail delegate (`users.settings.delegates.get`).
+
 use alloc::format;
 
 use log::{debug, trace};

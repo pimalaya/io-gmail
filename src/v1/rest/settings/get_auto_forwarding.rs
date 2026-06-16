@@ -1,3 +1,5 @@
+//! Get the Gmail auto-forwarding settings (`users.settings.getAutoForwarding`).
+
 use alloc::format;
 
 use log::{debug, trace};

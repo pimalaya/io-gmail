@@ -1,3 +1,5 @@
+//! Delete a Gmail draft (`users.drafts.delete`).
+
 use alloc::format;
 
 use log::{debug, trace};

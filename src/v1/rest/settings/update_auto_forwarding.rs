@@ -1,3 +1,6 @@
+//! Update the Gmail auto-forwarding settings
+//! (`users.settings.updateAutoForwarding`).
+
 use alloc::format;
 
 use log::{debug, trace};

@@ -1,3 +1,5 @@
+//! Get the Gmail vacation settings (`users.settings.getVacation`).
+
 use alloc::format;
 
 use log::{debug, trace};

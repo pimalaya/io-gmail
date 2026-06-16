@@ -1,3 +1,5 @@
+//! Delete a Gmail delegate (`users.settings.delegates.delete`).
+
 use alloc::format;
 
 use log::{debug, trace};

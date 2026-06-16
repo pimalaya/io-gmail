@@ -1,3 +1,5 @@
+//! List the Gmail filters (`users.settings.filters.list`).
+
 use alloc::{format, vec::Vec};
 
 use log::{debug, trace};

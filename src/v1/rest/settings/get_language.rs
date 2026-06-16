@@ -1,3 +1,5 @@
+//! Get the Gmail language settings (`users.settings.getLanguage`).
+
 use alloc::format;
 
 use log::{debug, trace};

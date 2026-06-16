@@ -1,3 +1,5 @@
+//! Delete a Gmail thread (`users.threads.delete`).
+
 use alloc::format;
 
 use log::{debug, trace};

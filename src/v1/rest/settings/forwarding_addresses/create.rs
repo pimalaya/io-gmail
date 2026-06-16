@@ -1,3 +1,6 @@
+//! Create a Gmail forwarding address
+//! (`users.settings.forwardingAddresses.create`).
+
 use alloc::format;
 
 use log::{debug, trace};

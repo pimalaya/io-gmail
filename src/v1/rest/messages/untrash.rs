@@ -1,3 +1,5 @@
+//! Untrash a Gmail message (`users.messages.untrash`).
+
 use alloc::{format, vec::Vec};
 
 use log::{debug, trace};

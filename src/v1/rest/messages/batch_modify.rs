@@ -1,3 +1,5 @@
+//! Batch-modify Gmail message labels (`users.messages.batchModify`).
+
 use alloc::{format, string::String};
 
 use log::{debug, trace};

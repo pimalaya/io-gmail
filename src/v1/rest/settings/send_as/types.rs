@@ -1,3 +1,5 @@
+//! Gmail send-as resource types.
+
 use alloc::string::String;
 
 use serde::{Deserialize, Serialize};

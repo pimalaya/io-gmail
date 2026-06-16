@@ -1,3 +1,5 @@
+//! Get a Gmail user profile (`users.getProfile`).
+
 use alloc::format;
 
 use log::{debug, trace};

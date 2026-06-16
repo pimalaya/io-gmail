@@ -1,3 +1,5 @@
+//! Get a Gmail message attachment (`users.messages.attachments.get`).
+
 use alloc::format;
 
 use log::{debug, trace};

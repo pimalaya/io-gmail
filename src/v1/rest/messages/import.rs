@@ -1,3 +1,5 @@
+//! Import a Gmail message (`users.messages.import`).
+
 use alloc::format;
 
 use log::{debug, trace};

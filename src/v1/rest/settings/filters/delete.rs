@@ -1,3 +1,5 @@
+//! Delete a Gmail filter (`users.settings.filters.delete`).
+
 use alloc::format;
 
 use log::{debug, trace};

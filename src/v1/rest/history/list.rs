@@ -1,3 +1,5 @@
+//! List the Gmail history records (`users.history.list`).
+
 use alloc::{
     format,
     string::{String, ToString},

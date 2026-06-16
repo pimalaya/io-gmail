@@ -1,3 +1,5 @@
+//! Gmail user-level resource types (profile, watch).
+
 use alloc::{string::String, vec::Vec};
 
 use serde::{Deserialize, Serialize};

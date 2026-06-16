@@ -1,3 +1,5 @@
+//! Set up Gmail push notifications (`users.watch`).
+
 use alloc::format;
 
 use log::{debug, trace};

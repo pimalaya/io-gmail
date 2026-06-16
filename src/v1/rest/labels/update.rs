@@ -1,3 +1,5 @@
+//! Update a Gmail label (`users.labels.update`).
+
 use alloc::format;
 
 use log::{debug, trace};

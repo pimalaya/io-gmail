@@ -1,3 +1,5 @@
+//! Verify a Gmail send-as alias (`users.settings.sendAs.verify`).
+
 use alloc::{format, vec::Vec};
 
 use log::{debug, trace};

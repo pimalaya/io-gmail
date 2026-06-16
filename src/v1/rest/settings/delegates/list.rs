@@ -1,3 +1,5 @@
+//! List the Gmail delegates (`users.settings.delegates.list`).
+
 use alloc::{format, vec::Vec};
 
 use log::{debug, trace};

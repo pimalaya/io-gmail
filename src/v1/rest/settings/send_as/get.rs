@@ -1,3 +1,5 @@
+//! Get a Gmail send-as alias (`users.settings.sendAs.get`).
+
 use alloc::format;
 
 use log::{debug, trace};

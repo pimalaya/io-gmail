@@ -1,3 +1,5 @@
+//! Delete a Gmail send-as alias (`users.settings.sendAs.delete`).
+
 use alloc::format;
 
 use log::{debug, trace};

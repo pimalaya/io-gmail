@@ -481,6 +481,7 @@ dependencies = [
 [[package]]
 name = "io-http"
 version = "0.1.1"
+source = "git+https://github.com/pimalaya/io-http#3d4c14e40699f2fa19d9f7b0e327742c2ba3cdee"
 dependencies = [
  "base64",
  "httparse",
@@ -722,6 +723,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 [[package]]
 name = "pimalaya-stream"
 version = "0.0.1"
+source = "git+https://github.com/pimalaya/stream#fc3892ac383b1f1eb0e0535df468593d1d3b10f8"
 dependencies = [
  "anyhow",
  "log",
@@ -1096,9 +1098,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "2.0.117"
+version = "2.0.118"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e665b8803e7b1d2a727f4023456bbbbe74da67099c585258af0ad9c5013b9b99"
+checksum = "1b9ae57f904213ebb649ce6895b8a66c66f0203b9319718f69a5612a065b1422"
 dependencies = [
  "proc-macro2",
  "quote",

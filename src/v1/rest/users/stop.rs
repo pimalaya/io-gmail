@@ -1,3 +1,5 @@
+//! Stop Gmail push notifications (`users.stop`).
+
 use alloc::{format, vec::Vec};
 
 use log::{debug, trace};

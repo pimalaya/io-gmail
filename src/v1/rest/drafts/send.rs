@@ -1,3 +1,5 @@
+//! Send a Gmail draft (`users.drafts.send`).
+
 use alloc::format;
 
 use log::{debug, trace};

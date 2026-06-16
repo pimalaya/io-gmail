@@ -1,3 +1,6 @@
+//! Delete a Gmail forwarding address
+//! (`users.settings.forwardingAddresses.delete`).
+
 use alloc::format;
 
 use log::{debug, trace};

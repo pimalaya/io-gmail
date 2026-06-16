@@ -1,3 +1,5 @@
+//! Update a Gmail draft (`users.drafts.update`).
+
 use alloc::format;
 
 use log::{debug, trace};

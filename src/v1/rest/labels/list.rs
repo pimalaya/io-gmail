@@ -1,3 +1,5 @@
+//! List the Gmail labels (`users.labels.list`).
+
 use alloc::format;
 
 use log::{debug, trace};

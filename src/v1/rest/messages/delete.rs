@@ -1,3 +1,5 @@
+//! Delete a Gmail message (`users.messages.delete`).
+
 use alloc::format;
 
 use log::{debug, trace};

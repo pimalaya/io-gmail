@@ -1,3 +1,5 @@
+//! Send a Gmail message (`users.messages.send`).
+
 use alloc::format;
 
 use log::{debug, trace};

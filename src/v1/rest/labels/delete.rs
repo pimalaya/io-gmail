@@ -1,3 +1,5 @@
+//! Delete a Gmail label (`users.labels.delete`).
+
 use alloc::format;
 
 use log::{debug, trace};

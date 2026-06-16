@@ -1,3 +1,5 @@
+//! Gmail message resource types.
+
 use alloc::{string::String, vec::Vec};
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};

@@ -1,3 +1,5 @@
+//! List the Gmail drafts (`users.drafts.list`).
+
 use alloc::{
     format,
     string::{String, ToString},

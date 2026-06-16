@@ -1,3 +1,5 @@
+//! Update the Gmail language settings (`users.settings.updateLanguage`).
+
 use alloc::format;
 
 use log::{debug, trace};

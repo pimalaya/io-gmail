@@ -1,3 +1,5 @@
+//! Get a Gmail thread (`users.threads.get`).
+
 use alloc::format;
 
 use log::{debug, trace};

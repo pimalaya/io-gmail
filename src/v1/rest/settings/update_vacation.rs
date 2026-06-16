@@ -1,3 +1,5 @@
+//! Update the Gmail vacation settings (`users.settings.updateVacation`).
+
 use alloc::format;
 
 use log::{debug, trace};

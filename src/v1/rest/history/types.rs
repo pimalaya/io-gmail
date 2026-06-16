@@ -1,3 +1,5 @@
+//! Gmail history resource types.
+
 use alloc::{string::String, vec::Vec};
 
 use serde::{Deserialize, Serialize};

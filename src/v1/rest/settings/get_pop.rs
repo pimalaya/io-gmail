@@ -1,3 +1,5 @@
+//! Get the Gmail POP settings (`users.settings.getPop`).
+
 use alloc::format;
 
 use log::{debug, trace};
