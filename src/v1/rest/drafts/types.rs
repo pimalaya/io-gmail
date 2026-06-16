@@ -2,10 +2,14 @@ use alloc::string::String;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
+use crate::v1::rest::messages::GmailMessage;
+
+/// Gmail REST draft resource (an id plus its draft message).
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailDraft {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub id: String,
-    #[serde(default)]
-    pub message: Option<crate::v1::rest::messages::GmailMessage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<GmailMessage>,
 }

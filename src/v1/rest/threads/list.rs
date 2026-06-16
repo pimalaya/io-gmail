@@ -1,5 +1,3 @@
-use core::fmt;
-
 use alloc::{
     format,
     string::{String, ToString},
@@ -18,6 +16,7 @@ use crate::{
     v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
 };
 
+/// Gmail REST thread listing response (one page of thread summaries).
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailThreadsListResponse {
@@ -29,8 +28,9 @@ pub struct GmailThreadsListResponse {
     pub result_size_estimate: Option<u64>,
 }
 
+/// Gmail REST thread listing, wrapping a page of thread summaries.
 pub struct GmailThreadsList {
-    state: State,
+    send: GmailSend<GmailThreadsListResponse>,
 }
 
 impl GmailThreadsList {
@@ -43,6 +43,8 @@ impl GmailThreadsList {
         page_token: Option<&str>,
         include_spam_trash: bool,
     ) -> Result<Self, GmailSendError> {
+        trace!("prepare gmail threads listing");
+
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/threads"))?;
 
         {
@@ -69,9 +71,9 @@ impl GmailThreadsList {
             }
         }
 
-        Ok(Self {
-            state: State::Send(GmailSend::get(http_auth, url)),
-        })
+        let send = GmailSend::get(http_auth, url);
+
+        Ok(Self { send })
     }
 }
 
@@ -80,24 +82,8 @@ impl GmailCoroutine for GmailThreadsList {
     type Return = Result<GmailSendOutput<GmailThreadsListResponse>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("threads-list: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailThreadsListResponse>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail threads listed: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

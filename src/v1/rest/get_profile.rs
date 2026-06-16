@@ -2,8 +2,6 @@
 //!
 //! <https://developers.google.com/gmail/api/reference/rest/v1/users/getProfile>
 
-use core::fmt;
-
 use alloc::{format, string::String};
 
 use log::trace;
@@ -30,16 +28,17 @@ pub struct GmailProfile {
 }
 
 pub struct GmailProfileGet {
-    state: State,
+    send: GmailSend<GmailProfile>,
 }
 
 impl GmailProfileGet {
     pub fn new(http_auth: &SecretString, user_id: &str) -> Result<Self, GmailSendError> {
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/profile"))?;
+        trace!("prepare gmail profile retrieval");
 
-        Ok(Self {
-            state: State::Send(GmailSend::get(http_auth, url)),
-        })
+        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/profile"))?;
+        let send = GmailSend::get(http_auth, url);
+
+        Ok(Self { send })
     }
 }
 
@@ -48,24 +47,8 @@ impl GmailCoroutine for GmailProfileGet {
     type Return = Result<GmailSendOutput<GmailProfile>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("profile-get: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailProfile>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail profile retrieved: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

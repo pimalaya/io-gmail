@@ -1,5 +1,3 @@
-use core::fmt;
-
 use alloc::{format, vec::Vec};
 
 use log::trace;
@@ -10,10 +8,13 @@ use url::Url;
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::rest::settings::delegates::GmailDelegate,
-    v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    v1::{
+        rest::settings::delegates::GmailDelegate,
+        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    },
 };
 
+/// Response wrapping the delegates of a Gmail account.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailDelegatesListResponse {
@@ -22,17 +23,18 @@ pub struct GmailDelegatesListResponse {
 }
 
 pub struct GmailDelegatesList {
-    state: State,
+    send: GmailSend<GmailDelegatesListResponse>,
 }
 
 impl GmailDelegatesList {
     pub fn new(http_auth: &SecretString, user_id: &str) -> Result<Self, GmailSendError> {
+        trace!("prepare gmail delegates listing");
+
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/delegates"))?;
+        let send = GmailSend::get(http_auth, url);
 
-        Ok(Self {
-            state: State::Send(GmailSend::get(http_auth, url)),
-        })
+        Ok(Self { send })
     }
 }
 
@@ -41,24 +43,8 @@ impl GmailCoroutine for GmailDelegatesList {
     type Return = Result<GmailSendOutput<GmailDelegatesListResponse>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("delegates-list: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailDelegatesListResponse>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail delegates listed: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

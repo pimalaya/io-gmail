@@ -4,10 +4,10 @@ use io_gmail::v1::{
     rest::{
         get_profile::GmailProfileGet,
         labels::{
-            create::GmailLabelCreate, delete::GmailLabelDelete, list::GmailLabelsList,
-            patch::GmailLabelPatch,
+            GmailLabel, GmailLabelListVisibility, create::GmailLabelCreate,
+            delete::GmailLabelDelete, list::GmailLabelsList, patch::GmailLabelPatch,
         },
-        messages::{decode_raw, encode_raw},
+        messages::{GmailMessageListVisibility, decode_raw, encode_raw},
     },
     send::{GmailSendError, parse_api_error},
 };
@@ -48,12 +48,18 @@ fn lists_labels() {
 }
 
 #[test]
-fn creates_label_with_default_visibilities() {
+fn creates_label_with_visibilities() {
     let response = json_response(
         "HTTP/1.1 200 OK",
         r#"{"id":"Label_1","name":"todo","type":"user"}"#,
     );
-    let mut coroutine = GmailLabelCreate::new(&auth(), "me", "todo").unwrap();
+    let label = GmailLabel {
+        name: "todo".into(),
+        label_list_visibility: Some(GmailLabelListVisibility::LabelShow),
+        message_list_visibility: Some(GmailMessageListVisibility::Show),
+        ..Default::default()
+    };
+    let mut coroutine = GmailLabelCreate::new(&auth(), "me", &label).unwrap();
     let (ret, written) = drive(&mut coroutine, &response);
 
     assert_eq!(ret.unwrap().response.id, "Label_1");
@@ -71,7 +77,11 @@ fn creates_label_with_default_visibilities() {
 
 #[test]
 fn rejects_empty_label_name() {
-    let result = GmailLabelCreate::new(&auth(), "me", "  ");
+    let label = GmailLabel {
+        name: "  ".into(),
+        ..Default::default()
+    };
+    let result = GmailLabelCreate::new(&auth(), "me", &label);
     assert!(matches!(result, Err(GmailSendError::InvalidRequest(_))));
 }
 
@@ -81,7 +91,12 @@ fn updates_label_with_patch() {
         "HTTP/1.1 200 OK",
         r#"{"id":"Label_1","name":"renamed","type":"user"}"#,
     );
-    let mut coroutine = GmailLabelPatch::new(&auth(), "me", "Label_1", "renamed").unwrap();
+    let label = GmailLabel {
+        id: "Label_1".into(),
+        name: "renamed".into(),
+        ..Default::default()
+    };
+    let mut coroutine = GmailLabelPatch::new(&auth(), "me", &label).unwrap();
     let (ret, written) = drive(&mut coroutine, &response);
 
     assert_eq!(ret.unwrap().response.name, "renamed");

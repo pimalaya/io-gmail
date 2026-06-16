@@ -1,5 +1,3 @@
-use core::fmt;
-
 use alloc::format;
 
 use log::trace;
@@ -13,8 +11,9 @@ use crate::{
     v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
 };
 
+/// Gmail REST attachment retrieval, wrapping a `GmailMessagePartBody`.
 pub struct GmailAttachmentGet {
-    state: State,
+    send: GmailSend<GmailMessagePartBody>,
 }
 
 impl GmailAttachmentGet {
@@ -24,13 +23,14 @@ impl GmailAttachmentGet {
         message_id: &str,
         id: &str,
     ) -> Result<Self, GmailSendError> {
+        trace!("prepare gmail attachment {id} retrieval");
+
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
             "users/{user_id}/messages/{message_id}/attachments/{id}"
         ))?;
+        let send = GmailSend::get(http_auth, url);
 
-        Ok(Self {
-            state: State::Send(GmailSend::get(http_auth, url)),
-        })
+        Ok(Self { send })
     }
 }
 
@@ -39,24 +39,8 @@ impl GmailCoroutine for GmailAttachmentGet {
     type Return = Result<GmailSendOutput<GmailMessagePartBody>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("attachment-get: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailMessagePartBody>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail attachment retrieved: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

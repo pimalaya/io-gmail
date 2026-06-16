@@ -188,27 +188,25 @@ impl GmailClientStd {
 
     pub fn label_create(
         &mut self,
-        name: &str,
+        label: &GmailLabel,
     ) -> Result<GmailSendOutput<GmailLabel>, GmailClientStdError> {
-        let coroutine = GmailLabelCreate::new(&self.http_auth, &self.user_id, name)?;
+        let coroutine = GmailLabelCreate::new(&self.http_auth, &self.user_id, label)?;
         self.run(coroutine)
     }
 
     pub fn label_update(
         &mut self,
-        id: &str,
-        name: &str,
+        label: &GmailLabel,
     ) -> Result<GmailSendOutput<GmailLabel>, GmailClientStdError> {
-        let coroutine = GmailLabelUpdate::new(&self.http_auth, &self.user_id, id, name)?;
+        let coroutine = GmailLabelUpdate::new(&self.http_auth, &self.user_id, label)?;
         self.run(coroutine)
     }
 
     pub fn label_patch(
         &mut self,
-        id: &str,
-        name: &str,
+        label: &GmailLabel,
     ) -> Result<GmailSendOutput<GmailLabel>, GmailClientStdError> {
-        let coroutine = GmailLabelPatch::new(&self.http_auth, &self.user_id, id, name)?;
+        let coroutine = GmailLabelPatch::new(&self.http_auth, &self.user_id, label)?;
         self.run(coroutine)
     }
 
@@ -254,9 +252,9 @@ impl GmailClientStd {
 
     pub fn message_send(
         &mut self,
-        rfc5322: &[u8],
+        message: &GmailMessage,
     ) -> Result<GmailSendOutput<GmailMessageId>, GmailClientStdError> {
-        let coroutine = GmailMessageSend::new(&self.http_auth, &self.user_id, rfc5322)?;
+        let coroutine = GmailMessageSend::new(&self.http_auth, &self.user_id, message)?;
         self.run(coroutine)
     }
 

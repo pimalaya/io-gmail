@@ -1,5 +1,3 @@
-use core::fmt;
-
 use alloc::{format, string::String};
 
 use log::trace;
@@ -21,8 +19,9 @@ struct GmailThreadModifyRequest<'a> {
     remove_label_ids: &'a [String],
 }
 
+/// Gmail REST thread label modification, wrapping the updated `GmailThread`.
 pub struct GmailThreadModify {
-    state: State,
+    send: GmailSend<GmailThread>,
 }
 
 impl GmailThreadModify {
@@ -33,6 +32,8 @@ impl GmailThreadModify {
         add_label_ids: &[String],
         remove_label_ids: &[String],
     ) -> Result<Self, GmailSendError> {
+        trace!("prepare gmail thread {id} modification");
+
         if add_label_ids.is_empty() && remove_label_ids.is_empty() {
             return Err(GmailSendError::InvalidRequest(String::from(
                 "Modify requires at least one label update",
@@ -45,10 +46,9 @@ impl GmailThreadModify {
             add_label_ids,
             remove_label_ids,
         };
+        let send = GmailSend::post_json(http_auth, url, &body)?;
 
-        Ok(Self {
-            state: State::Send(GmailSend::post_json(http_auth, url, &body)?),
-        })
+        Ok(Self { send })
     }
 }
 
@@ -57,24 +57,8 @@ impl GmailCoroutine for GmailThreadModify {
     type Return = Result<GmailSendOutput<GmailThread>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("thread-modify: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailThread>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail thread modified: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

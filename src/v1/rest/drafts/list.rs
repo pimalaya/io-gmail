@@ -1,5 +1,3 @@
-use core::fmt;
-
 use alloc::{
     format,
     string::{String, ToString},
@@ -14,10 +12,13 @@ use url::Url;
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::rest::drafts::GmailDraft,
-    v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    v1::{
+        rest::drafts::GmailDraft,
+        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    },
 };
 
+/// Gmail REST draft listing response (one page of drafts).
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailDraftsListResponse {
@@ -29,8 +30,9 @@ pub struct GmailDraftsListResponse {
     pub result_size_estimate: Option<u64>,
 }
 
+/// Gmail REST draft listing, wrapping a page of drafts.
 pub struct GmailDraftsList {
-    state: State,
+    send: GmailSend<GmailDraftsListResponse>,
 }
 
 impl GmailDraftsList {
@@ -42,6 +44,8 @@ impl GmailDraftsList {
         page_token: Option<&str>,
         include_spam_trash: bool,
     ) -> Result<Self, GmailSendError> {
+        trace!("prepare gmail drafts listing");
+
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/drafts"))?;
 
         {
@@ -64,9 +68,9 @@ impl GmailDraftsList {
             }
         }
 
-        Ok(Self {
-            state: State::Send(GmailSend::get(http_auth, url)),
-        })
+        let send = GmailSend::get(http_auth, url);
+
+        Ok(Self { send })
     }
 }
 
@@ -75,24 +79,8 @@ impl GmailCoroutine for GmailDraftsList {
     type Return = Result<GmailSendOutput<GmailDraftsListResponse>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("drafts-list: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailDraftsListResponse>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail drafts listed: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

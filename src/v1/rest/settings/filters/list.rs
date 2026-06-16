@@ -1,5 +1,3 @@
-use core::fmt;
-
 use alloc::{format, vec::Vec};
 
 use log::trace;
@@ -10,10 +8,13 @@ use url::Url;
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::rest::settings::filters::GmailFilter,
-    v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    v1::{
+        rest::settings::filters::GmailFilter,
+        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    },
 };
 
+/// Response wrapping the filters of a Gmail account.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailFiltersListResponse {
@@ -22,16 +23,17 @@ pub struct GmailFiltersListResponse {
 }
 
 pub struct GmailFiltersList {
-    state: State,
+    send: GmailSend<GmailFiltersListResponse>,
 }
 
 impl GmailFiltersList {
     pub fn new(http_auth: &SecretString, user_id: &str) -> Result<Self, GmailSendError> {
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/filters"))?;
+        trace!("prepare gmail filters listing");
 
-        Ok(Self {
-            state: State::Send(GmailSend::get(http_auth, url)),
-        })
+        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/filters"))?;
+        let send = GmailSend::get(http_auth, url);
+
+        Ok(Self { send })
     }
 }
 
@@ -40,24 +42,8 @@ impl GmailCoroutine for GmailFiltersList {
     type Return = Result<GmailSendOutput<GmailFiltersListResponse>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("filters-list: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailFiltersListResponse>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail filters listed: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

@@ -1,56 +1,35 @@
-use core::fmt;
-
-use alloc::{format, string::String};
+use alloc::format;
 
 use log::trace;
 use secrecy::SecretString;
-use serde::Serialize;
 use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::rest::drafts::GmailDraft,
-    v1::rest::messages::encode_raw,
-    v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    v1::{
+        rest::drafts::GmailDraft,
+        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    },
 };
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GmailDraftCreateRequest {
-    message: DraftMessage,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DraftMessage {
-    raw: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    thread_id: Option<String>,
-}
-
+/// Gmail REST draft creation, wrapping the created `GmailDraft`.
 pub struct GmailDraftCreate {
-    state: State,
+    send: GmailSend<GmailDraft>,
 }
 
 impl GmailDraftCreate {
     pub fn new(
         http_auth: &SecretString,
         user_id: &str,
-        rfc5322: &[u8],
-        thread_id: Option<&str>,
+        draft: &GmailDraft,
     ) -> Result<Self, GmailSendError> {
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/drafts"))?;
-        let body = GmailDraftCreateRequest {
-            message: DraftMessage {
-                raw: encode_raw(rfc5322),
-                thread_id: thread_id.map(String::from),
-            },
-        };
+        trace!("prepare gmail draft creation");
 
-        Ok(Self {
-            state: State::Send(GmailSend::post_json(http_auth, url, &body)?),
-        })
+        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/drafts"))?;
+        let send = GmailSend::post_json(http_auth, url, draft)?;
+
+        Ok(Self { send })
     }
 }
 
@@ -59,24 +38,8 @@ impl GmailCoroutine for GmailDraftCreate {
     type Return = Result<GmailSendOutput<GmailDraft>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("draft-create: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailDraft>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail draft created: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

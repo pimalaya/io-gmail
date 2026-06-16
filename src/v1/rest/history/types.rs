@@ -33,3 +33,19 @@ pub struct GmailHistoryLabel {
     #[serde(default)]
     pub label_ids: Vec<String>,
 }
+
+/// Kind of change to filter the history list on (`historyTypes`).
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum GmailHistoryType {
+    MessageAdded,
+    MessageDeleted,
+    LabelAdded,
+    LabelRemoved,
+}
+
+impl GmailHistoryType {
+    pub fn as_str(self) -> &'static str {
+        serde_variant::to_variant_name(&self).unwrap_or_default()
+    }
+}

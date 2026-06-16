@@ -3,33 +3,35 @@ use alloc::{string::String, vec::Vec};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
-pub struct GmailMessageId {
-    pub id: String,
-    #[serde(rename = "threadId", default)]
-    pub thread_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailMessage {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub id: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_id: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub label_ids: Vec<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub internal_date: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snippet: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payload: Option<GmailMessagePayload>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raw: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size_estimate: Option<u64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub history_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GmailMessageId {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
@@ -75,6 +77,15 @@ pub struct GmailMessageHeader {
     pub value: String,
 }
 
+/// Whether messages carrying a label show up in the message list.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum GmailMessageListVisibility {
+    Show,
+    Hide,
+}
+
+/// Amount of message detail to return (`format` query parameter).
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum GmailMessageFormat {
     Minimal,
@@ -90,6 +101,23 @@ impl GmailMessageFormat {
             Self::Full => "FULL",
             Self::Raw => "RAW",
             Self::Metadata => "METADATA",
+        }
+    }
+}
+
+/// Source of the internal date when importing or inserting a message
+/// (`internalDateSource` query parameter).
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum GmailInternalDateSource {
+    ReceivedTime,
+    DateHeader,
+}
+
+impl GmailInternalDateSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ReceivedTime => "RECEIVED_TIME",
+            Self::DateHeader => "DATE_HEADER",
         }
     }
 }

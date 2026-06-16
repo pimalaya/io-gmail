@@ -20,7 +20,12 @@ use std::{
 };
 
 use io_gmail::v1::{
-    client::GmailClientStd, rest::messages::GmailMessageFormat, send::GMAIL_API_BASE,
+    client::GmailClientStd,
+    rest::{
+        labels::GmailLabel,
+        messages::{GmailMessage, GmailMessageFormat, encode_raw},
+    },
+    send::GMAIL_API_BASE,
 };
 use pimalaya_stream::tls::Tls;
 use secrecy::SecretString;
@@ -64,8 +69,12 @@ fn gmail() {
 
     // ── LABEL CREATE ─────────────────────────────────────────────────────────
 
+    let new_label = GmailLabel {
+        name: label_name.clone(),
+        ..Default::default()
+    };
     let label = client
-        .label_create(&label_name)
+        .label_create(&new_label)
         .expect("label create")
         .response;
     let label_id = label.id.clone();
@@ -78,8 +87,13 @@ fn gmail() {
 
     // ── LABEL UPDATE (rename) ────────────────────────────────────────────────
 
+    let renamed_label = GmailLabel {
+        id: label_id.clone(),
+        name: label_name_renamed.clone(),
+        ..Default::default()
+    };
     let renamed = client
-        .label_update(&label_id, &label_name_renamed)
+        .label_update(&renamed_label)
         .expect("label update")
         .response;
     assert_eq!(
@@ -90,7 +104,14 @@ fn gmail() {
     // ── MESSAGE SEND ─────────────────────────────────────────────────────────
 
     let eml = build_eml(&email).into_bytes();
-    let sent = client.message_send(&eml).expect("message send").response;
+    let message = GmailMessage {
+        raw: Some(encode_raw(&eml)),
+        ..Default::default()
+    };
+    let sent = client
+        .message_send(&message)
+        .expect("message send")
+        .response;
     let message_id = sent.id.clone();
 
     // ── MESSAGE GET (verify send) ────────────────────────────────────────────

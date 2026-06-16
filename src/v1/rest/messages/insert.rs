@@ -1,51 +1,48 @@
-use core::fmt;
-
-use alloc::{format, string::String};
+use alloc::format;
 
 use log::trace;
 use secrecy::SecretString;
-use serde::Serialize;
 use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::rest::messages::{GmailMessage, encode_raw},
+    v1::rest::messages::{GmailInternalDateSource, GmailMessage},
     v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
 };
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GmailMessageInsertRequest<'a> {
-    raw: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    label_ids: Option<&'a [String]>,
-}
-
+/// Gmail REST message insert, wrapping the inserted `GmailMessage`.
 pub struct GmailMessageInsert {
-    state: State,
+    send: GmailSend<GmailMessage>,
 }
 
 impl GmailMessageInsert {
     pub fn new(
         http_auth: &SecretString,
         user_id: &str,
-        rfc5322: &[u8],
-        label_ids: &[String],
+        message: &GmailMessage,
+        internal_date_source: Option<GmailInternalDateSource>,
+        deleted: bool,
     ) -> Result<Self, GmailSendError> {
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages"))?;
-        let body = GmailMessageInsertRequest {
-            raw: encode_raw(rfc5322),
-            label_ids: if label_ids.is_empty() {
-                None
-            } else {
-                Some(label_ids)
-            },
-        };
+        trace!("prepare gmail message insertion");
 
-        Ok(Self {
-            state: State::Send(GmailSend::post_json(http_auth, url, &body)?),
-        })
+        let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages"))?;
+
+        {
+            let mut query = url.query_pairs_mut();
+
+            if let Some(internal_date_source) = internal_date_source {
+                query.append_pair("internalDateSource", internal_date_source.as_str());
+            }
+
+            if deleted {
+                query.append_pair("deleted", "true");
+            }
+        }
+
+        let send = GmailSend::post_json(http_auth, url, message)?;
+
+        Ok(Self { send })
     }
 }
 
@@ -54,24 +51,8 @@ impl GmailCoroutine for GmailMessageInsert {
     type Return = Result<GmailSendOutput<GmailMessage>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("message-insert: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailMessage>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail message inserted: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

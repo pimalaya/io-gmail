@@ -1,42 +1,33 @@
-use core::fmt;
-
-use alloc::{format, string::String};
+use alloc::format;
 
 use log::trace;
 use secrecy::SecretString;
-use serde::Serialize;
 use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::rest::messages::{GmailMessageId, encode_raw},
+    v1::rest::messages::{GmailMessage, GmailMessageId},
     v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
 };
 
-#[derive(Debug, Serialize)]
-struct GmailMessageSendRequest {
-    raw: String,
-}
-
+/// Gmail REST message send, wrapping the resulting `GmailMessageId`.
 pub struct GmailMessageSend {
-    state: State,
+    send: GmailSend<GmailMessageId>,
 }
 
 impl GmailMessageSend {
     pub fn new(
         http_auth: &SecretString,
         user_id: &str,
-        rfc5322: &[u8],
+        message: &GmailMessage,
     ) -> Result<Self, GmailSendError> {
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/send"))?;
-        let body = GmailMessageSendRequest {
-            raw: encode_raw(rfc5322),
-        };
+        trace!("prepare gmail message send");
 
-        Ok(Self {
-            state: State::Send(GmailSend::post_json(http_auth, url, &body)?),
-        })
+        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/send"))?;
+        let send = GmailSend::post_json(http_auth, url, message)?;
+
+        Ok(Self { send })
     }
 }
 
@@ -45,24 +36,8 @@ impl GmailCoroutine for GmailMessageSend {
     type Return = Result<GmailSendOutput<GmailMessageId>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("message-send: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailMessageId>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail message sent: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

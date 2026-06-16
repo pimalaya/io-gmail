@@ -1,5 +1,3 @@
-use core::fmt;
-
 use alloc::{format, string::String};
 
 use log::trace;
@@ -18,8 +16,9 @@ struct GmailMessageBatchDeleteRequest<'a> {
     ids: &'a [String],
 }
 
+/// Gmail REST batch message deletion, yielding no response body.
 pub struct GmailMessageBatchDelete {
-    state: State,
+    send: GmailSend<GmailNoResponse>,
 }
 
 impl GmailMessageBatchDelete {
@@ -28,13 +27,14 @@ impl GmailMessageBatchDelete {
         user_id: &str,
         ids: &[String],
     ) -> Result<Self, GmailSendError> {
+        trace!("prepare gmail messages batch deletion");
+
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/batchDelete"))?;
         let body = GmailMessageBatchDeleteRequest { ids };
+        let send = GmailSend::post_json(http_auth, url, &body)?;
 
-        Ok(Self {
-            state: State::Send(GmailSend::post_json(http_auth, url, &body)?),
-        })
+        Ok(Self { send })
     }
 }
 
@@ -43,24 +43,8 @@ impl GmailCoroutine for GmailMessageBatchDelete {
     type Return = Result<GmailSendOutput<GmailNoResponse>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("message-batch-delete: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailNoResponse>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail messages batch deleted: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

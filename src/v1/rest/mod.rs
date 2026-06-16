@@ -3,9 +3,8 @@
 //!
 //! <https://developers.google.com/gmail/api/reference/rest>
 
-pub mod get_profile;
-
 pub mod drafts;
+pub mod get_profile;
 pub mod history;
 pub mod labels;
 pub mod messages;

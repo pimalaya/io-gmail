@@ -1,6 +1,4 @@
-use core::fmt;
-
-use alloc::format;
+use alloc::{format, vec::Vec};
 
 use log::trace;
 use secrecy::SecretString;
@@ -13,7 +11,7 @@ use crate::{
 };
 
 pub struct GmailSendAsVerify {
-    state: State,
+    send: GmailSend<GmailNoResponse>,
 }
 
 impl GmailSendAsVerify {
@@ -22,19 +20,14 @@ impl GmailSendAsVerify {
         user_id: &str,
         send_as_email: &str,
     ) -> Result<Self, GmailSendError> {
+        trace!("prepare gmail send-as alias {send_as_email} verification");
+
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
             "users/{user_id}/settings/sendAs/{send_as_email}/verify"
         ))?;
+        let send = GmailSend::with_method(http_auth, "POST", url, None, Vec::new());
 
-        Ok(Self {
-            state: State::Send(GmailSend::with_method(
-                http_auth,
-                "POST",
-                url,
-                None,
-                alloc::vec::Vec::new(),
-            )),
-        })
+        Ok(Self { send })
     }
 }
 
@@ -43,24 +36,8 @@ impl GmailCoroutine for GmailSendAsVerify {
     type Return = Result<GmailSendOutput<GmailNoResponse>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
-        trace!("send-as-verify: {}", self.state);
-        match &mut self.state {
-            State::Send(send) => {
-                let out = gmail_try!(send, arg);
-                GmailCoroutineState::Complete(Ok(out))
-            }
-        }
-    }
-}
-
-enum State {
-    Send(GmailSend<GmailNoResponse>),
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Send(_) => f.write_str("send"),
-        }
+        let out = gmail_try!(&mut self.send, arg);
+        trace!("gmail send-as alias verification requested: {out:?}");
+        GmailCoroutineState::Complete(Ok(out))
     }
 }

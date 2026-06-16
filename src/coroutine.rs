@@ -31,6 +31,7 @@ macro_rules! gmail_try {
                 return $crate::coroutine::GmailCoroutineState::Yielded(y.into());
             }
             $crate::coroutine::GmailCoroutineState::Complete(Err(err)) => {
+                log::trace!("error during coroutine execution: {err}");
                 return $crate::coroutine::GmailCoroutineState::Complete(Err(err.into()));
             }
             $crate::coroutine::GmailCoroutineState::Complete(Ok(value)) => value,
