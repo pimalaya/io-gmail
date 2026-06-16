@@ -19,7 +19,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use io_gmail::{client::GmailClientStd, messages::GmailMessageFormat, send::GMAIL_API_BASE};
+use io_gmail::v1::{
+    client::GmailClientStd, rest::messages::GmailMessageFormat, send::GMAIL_API_BASE,
+};
 use pimalaya_stream::tls::Tls;
 use secrecy::SecretString;
 use url::Url;

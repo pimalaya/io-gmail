@@ -1,12 +1,14 @@
 mod common;
 
-use io_gmail::{
-    labels::{
-        create::GmailLabelCreate, delete::GmailLabelDelete, list::GmailLabelsList,
-        update::GmailLabelUpdate,
+use io_gmail::v1::{
+    rest::{
+        get_profile::GmailProfileGet,
+        labels::{
+            create::GmailLabelCreate, delete::GmailLabelDelete, list::GmailLabelsList,
+            patch::GmailLabelPatch,
+        },
+        messages::{decode_raw, encode_raw},
     },
-    messages::{decode_raw, encode_raw},
-    profile::GmailProfileGet,
     send::{GmailSendError, parse_api_error},
 };
 use secrecy::SecretString;
@@ -79,7 +81,7 @@ fn updates_label_with_patch() {
         "HTTP/1.1 200 OK",
         r#"{"id":"Label_1","name":"renamed","type":"user"}"#,
     );
-    let mut coroutine = GmailLabelUpdate::new(&auth(), "me", "Label_1", "renamed").unwrap();
+    let mut coroutine = GmailLabelPatch::new(&auth(), "me", "Label_1", "renamed").unwrap();
     let (ret, written) = drive(&mut coroutine, &response);
 
     assert_eq!(ret.unwrap().response.name, "renamed");
