@@ -38,6 +38,8 @@ pub struct GmailMessagePayload {
     #[serde(default)]
     pub mime_type: Option<String>,
     #[serde(default)]
+    pub body: Option<GmailMessagePartBody>,
+    #[serde(default)]
     pub filename: String,
     #[serde(default)]
     pub headers: Vec<GmailMessageHeader>,
@@ -52,6 +54,17 @@ impl GmailMessagePayload {
             .find(|header| header.name.eq_ignore_ascii_case(name))
             .map(|header| header.value.as_str())
     }
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GmailMessagePartBody {
+    #[serde(default)]
+    pub attachment_id: Option<String>,
+    #[serde(default)]
+    pub size: u32,
+    #[serde(default)]
+    pub data: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
