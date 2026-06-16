@@ -1,35 +1,30 @@
 #![allow(dead_code)]
 
-use std::io::{self, Cursor, Read, Write};
+use io_gmail::coroutine::*;
 
-pub struct StubStream<'a> {
-    read: Cursor<&'a [u8]>,
-    pub written: Vec<u8>,
-}
+pub fn drive<C: GmailCoroutine<Yield = GmailYield>>(
+    coroutine: &mut C,
+    response: &[u8],
+) -> (C::Return, Vec<u8>) {
+    let mut written = Vec::new();
+    let mut fed = false;
+    let mut arg: Option<&[u8]> = None;
 
-impl<'a> StubStream<'a> {
-    pub fn new(response: &'a [u8]) -> Self {
-        Self {
-            read: Cursor::new(response),
-            written: Vec::new(),
+    loop {
+        match coroutine.resume(arg.take()) {
+            GmailCoroutineState::Complete(ret) => return (ret, written),
+            GmailCoroutineState::Yielded(GmailYield::WantsWrite(bytes)) => {
+                written.extend_from_slice(&bytes);
+            }
+            GmailCoroutineState::Yielded(GmailYield::WantsRead) => {
+                if fed {
+                    arg = Some(&[]);
+                } else {
+                    fed = true;
+                    arg = Some(response);
+                }
+            }
         }
-    }
-}
-
-impl Read for StubStream<'_> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.read.read(buf)
-    }
-}
-
-impl Write for StubStream<'_> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.written.extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
     }
 }
 

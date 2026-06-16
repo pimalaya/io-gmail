@@ -1,17 +1,20 @@
+use core::fmt;
+
 use alloc::format;
 
-use io_socket::io::SocketOutput;
+use log::trace;
 use secrecy::SecretString;
+use url::Url;
 
 use crate::{
-    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendResult},
-    types::message::{Message, MessageFormat},
+    coroutine::*,
+    gmail_try,
+    messages::{GmailMessage, GmailMessageFormat},
+    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
 };
 
-pub type GmailMessageGetResult = GmailSendResult<Message>;
-
 pub struct GmailMessageGet {
-    send: GmailSend<Message>,
+    state: State,
 }
 
 impl GmailMessageGet {
@@ -19,17 +22,17 @@ impl GmailMessageGet {
         http_auth: &SecretString,
         user_id: &str,
         id: &str,
-        format: MessageFormat,
+        format: GmailMessageFormat,
         metadata_headers: &[&str],
     ) -> Result<Self, GmailSendError> {
         let mut url =
-            url::Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/{id}"))?;
+            Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/{id}"))?;
 
         {
             let mut query = url.query_pairs_mut();
             query.append_pair("format", format.as_str());
 
-            if matches!(format, MessageFormat::Metadata) {
+            if matches!(format, GmailMessageFormat::Metadata) {
                 for header in metadata_headers {
                     query.append_pair("metadataHeaders", header);
                 }
@@ -37,11 +40,34 @@ impl GmailMessageGet {
         }
 
         Ok(Self {
-            send: GmailSend::get(http_auth, url),
+            state: State::Send(GmailSend::get(http_auth, url)),
         })
     }
+}
 
-    pub fn resume(&mut self, arg: Option<SocketOutput>) -> GmailMessageGetResult {
-        self.send.resume(arg)
+impl GmailCoroutine for GmailMessageGet {
+    type Yield = GmailYield;
+    type Return = Result<GmailSendOutput<GmailMessage>, GmailSendError>;
+
+    fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
+        trace!("message-get: {}", self.state);
+        match &mut self.state {
+            State::Send(send) => {
+                let out = gmail_try!(send, arg);
+                GmailCoroutineState::Complete(Ok(out))
+            }
+        }
+    }
+}
+
+enum State {
+    Send(GmailSend<GmailMessage>),
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Send(_) => f.write_str("send"),
+        }
     }
 }

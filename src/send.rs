@@ -1,26 +1,33 @@
-use alloc::{format, string::String, vec::Vec};
-use core::marker::PhantomData;
+use core::{fmt, marker::PhantomData};
+
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 use io_http::{
-    rfc9110::request::HttpRequest,
-    rfc9112::send::{Http11Send, Http11SendError, Http11SendResult},
+    coroutine::{HttpCoroutine, HttpCoroutineState},
+    rfc9110::{
+        request::HttpRequest,
+        send::{HttpSendOutput, HttpSendYield},
+    },
+    rfc9112::send::{Http11Send, Http11SendError},
 };
-use io_socket::io::{SocketInput, SocketOutput};
-use log::info;
+use log::trace;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use thiserror::Error;
 use url::Url;
 
-use crate::error::parse_api_error;
+use crate::coroutine::{GmailCoroutine, GmailCoroutineState, GmailYield};
 
 pub const GMAIL_API_BASE: &str = "https://gmail.googleapis.com/gmail/v1/";
 pub const GMAIL_UPLOAD_BASE: &str = "https://gmail.googleapis.com/upload/gmail/v1/";
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
-pub struct NoResponse;
+pub struct GmailNoResponse;
 
-impl<'de> Deserialize<'de> for NoResponse {
+impl<'de> Deserialize<'de> for GmailNoResponse {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -32,26 +39,26 @@ impl<'de> Deserialize<'de> for NoResponse {
 
 #[derive(Debug, Error)]
 pub enum GmailSendError {
-    #[error("Send HTTP request error: {0}")]
-    SendHttp(#[from] Http11SendError),
-    #[error("Serialize Gmail request error: {0}")]
+    #[error("Gmail HTTP request failed: {0}")]
+    Send(#[from] Http11SendError),
+    #[error("Gmail request serialization failed: {0}")]
     SerializeRequest(#[source] serde_json::Error),
-    #[error("Parse Gmail response error: {0}")]
+    #[error("Gmail response parsing failed: {0}")]
     ParseResponse(#[source] serde_json::Error),
-    #[error("Parse Gmail URL error: {0}")]
+    #[error("Gmail URL parsing failed: {0}")]
     ParseUrl(#[from] url::ParseError),
     #[error("Invalid Gmail request: {0}")]
     InvalidRequest(String),
     #[error("Gmail API returned HTTP {status}: {message}")]
-    ApiError { status: u16, message: String },
-    #[error("Gmail server returned unexpected redirect")]
+    Api { status: u16, message: String },
+    #[error("Gmail server returned an unexpected redirect")]
     UnexpectedRedirect,
 }
 
 impl GmailSendError {
     pub fn status(&self) -> Option<u16> {
         match self {
-            Self::ApiError { status, .. } => Some(*status),
+            Self::Api { status, .. } => Some(*status),
             _ => None,
         }
     }
@@ -61,21 +68,24 @@ impl GmailSendError {
     }
 }
 
-#[derive(Debug)]
-pub enum GmailSendResult<T> {
-    Ok { response: T, keep_alive: bool },
-    Io { input: SocketInput },
-    Err { err: GmailSendError },
+#[derive(Clone, Debug)]
+pub struct GmailSendOutput<T> {
+    pub response: T,
+    pub keep_alive: bool,
 }
 
 pub struct GmailSend<T> {
-    send: Http11Send,
+    state: State,
     _phantom: PhantomData<T>,
 }
 
 impl<T: DeserializeOwned> GmailSend<T> {
     pub fn get(http_auth: &SecretString, url: Url) -> Self {
         Self::with_method(http_auth, "GET", url, None, Vec::new())
+    }
+
+    pub fn delete(http_auth: &SecretString, url: Url) -> Self {
+        Self::with_method(http_auth, "DELETE", url, None, Vec::new())
     }
 
     pub fn post_json<B: Serialize>(
@@ -108,6 +118,21 @@ impl<T: DeserializeOwned> GmailSend<T> {
         ))
     }
 
+    pub fn patch_json<B: Serialize>(
+        http_auth: &SecretString,
+        url: Url,
+        body: &B,
+    ) -> Result<Self, GmailSendError> {
+        let body = serde_json::to_vec(body).map_err(GmailSendError::SerializeRequest)?;
+        Ok(Self::with_method(
+            http_auth,
+            "PATCH",
+            url,
+            Some("application/json"),
+            body,
+        ))
+    }
+
     pub fn with_method(
         http_auth: &SecretString,
         method: &str,
@@ -116,12 +141,11 @@ impl<T: DeserializeOwned> GmailSend<T> {
         body: Vec<u8>,
     ) -> Self {
         let host = url.host_str().unwrap_or("localhost");
-        let auth = format!("Bearer {}", http_auth.expose_secret());
 
         let mut request = HttpRequest::get(url.clone())
             .header("Host", host)
             .header("Accept", "application/json")
-            .header("Authorization", auth)
+            .header("Authorization", http_auth.expose_secret())
             .body(body);
 
         if let Some(content_type) = content_type {
@@ -130,53 +154,105 @@ impl<T: DeserializeOwned> GmailSend<T> {
 
         request.method = method.into();
 
-        info!("send Gmail request to {url}");
+        trace!("send Gmail {method} request to {url}");
 
         Self {
-            send: Http11Send::new(request),
+            state: State::Send(Http11Send::new(request)),
             _phantom: PhantomData,
         }
     }
+}
 
-    pub fn delete(http_auth: &SecretString, url: Url) -> Self {
-        Self::with_method(http_auth, "DELETE", url, None, Vec::new())
-    }
+impl<T: DeserializeOwned> GmailCoroutine for GmailSend<T> {
+    type Yield = GmailYield;
+    type Return = Result<GmailSendOutput<T>, GmailSendError>;
 
-    pub fn resume(&mut self, arg: Option<SocketOutput>) -> GmailSendResult<T> {
-        match self.send.resume(arg) {
-            Http11SendResult::Ok {
-                response,
-                keep_alive,
-                ..
-            } => {
-                if response.status.is_success() {
-                    let body = if response.body.is_empty() {
-                        b"null".as_slice()
+    fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
+        trace!("send: {}", self.state);
+        match &mut self.state {
+            State::Send(send) => match send.resume(arg) {
+                HttpCoroutineState::Yielded(HttpSendYield::WantsRead) => {
+                    GmailCoroutineState::Yielded(GmailYield::WantsRead)
+                }
+                HttpCoroutineState::Yielded(HttpSendYield::WantsWrite(bytes)) => {
+                    GmailCoroutineState::Yielded(GmailYield::WantsWrite(bytes))
+                }
+                HttpCoroutineState::Yielded(HttpSendYield::WantsRedirect { .. }) => {
+                    GmailCoroutineState::Complete(Err(GmailSendError::UnexpectedRedirect))
+                }
+                HttpCoroutineState::Complete(Err(err)) => {
+                    GmailCoroutineState::Complete(Err(err.into()))
+                }
+                HttpCoroutineState::Complete(Ok(HttpSendOutput {
+                    response,
+                    keep_alive,
+                    ..
+                })) => {
+                    if response.status.is_success() {
+                        let body = if response.body.is_empty() {
+                            b"null".as_slice()
+                        } else {
+                            response.body.as_slice()
+                        };
+
+                        match serde_json::from_slice::<T>(body) {
+                            Ok(response) => GmailCoroutineState::Complete(Ok(GmailSendOutput {
+                                response,
+                                keep_alive,
+                            })),
+                            Err(err) => GmailCoroutineState::Complete(Err(
+                                GmailSendError::ParseResponse(err),
+                            )),
+                        }
                     } else {
-                        response.body.as_slice()
-                    };
-
-                    match serde_json::from_slice::<T>(body) {
-                        Ok(response) => GmailSendResult::Ok {
-                            response,
-                            keep_alive,
-                        },
-                        Err(err) => GmailSendResult::Err {
-                            err: GmailSendError::ParseResponse(err),
-                        },
-                    }
-                } else {
-                    let (status, message) = parse_api_error(*response.status, &response.body);
-                    GmailSendResult::Err {
-                        err: GmailSendError::ApiError { status, message },
+                        let (status, message) = parse_api_error(*response.status, &response.body);
+                        GmailCoroutineState::Complete(Err(GmailSendError::Api { status, message }))
                     }
                 }
-            }
-            Http11SendResult::Io { input } => GmailSendResult::Io { input },
-            Http11SendResult::Redirect { .. } => GmailSendResult::Err {
-                err: GmailSendError::UnexpectedRedirect,
             },
-            Http11SendResult::Err { err } => GmailSendResult::Err { err: err.into() },
         }
+    }
+}
+
+enum State {
+    Send(Http11Send),
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Send(_) => f.write_str("send"),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ErrorEnvelope {
+    error: ErrorBody,
+}
+
+#[derive(Debug, Deserialize)]
+struct ErrorBody {
+    code: Option<u16>,
+    message: Option<String>,
+}
+
+pub fn parse_api_error(http_status: u16, body: &[u8]) -> (u16, String) {
+    if let Ok(envelope) = serde_json::from_slice::<ErrorEnvelope>(body) {
+        let status = envelope.error.code.unwrap_or(http_status);
+        let message = envelope
+            .error
+            .message
+            .filter(|message| !message.trim().is_empty())
+            .unwrap_or_else(|| String::from("unknown Gmail API error"));
+        return (status, message);
+    }
+
+    let message = String::from_utf8_lossy(body).trim().to_string();
+
+    if message.is_empty() {
+        (http_status, String::from("unknown Gmail API error"))
+    } else {
+        (http_status, message)
     }
 }

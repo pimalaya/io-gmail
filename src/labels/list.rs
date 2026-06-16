@@ -1,28 +1,55 @@
+use core::fmt;
+
 use alloc::format;
 
-use io_socket::io::SocketOutput;
+use log::trace;
 use secrecy::SecretString;
+use url::Url;
 
 use crate::{
-    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendResult},
-    types::label::GmailLabelsListResponse,
+    coroutine::*,
+    gmail_try,
+    labels::GmailLabelsListResponse,
+    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
 };
 
-pub type GmailLabelsListResult = GmailSendResult<GmailLabelsListResponse>;
-
 pub struct GmailLabelsList {
-    send: GmailSend<GmailLabelsListResponse>,
+    state: State,
 }
 
 impl GmailLabelsList {
     pub fn new(http_auth: &SecretString, user_id: &str) -> Result<Self, GmailSendError> {
-        let url = url::Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/labels"))?;
+        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/labels"))?;
+
         Ok(Self {
-            send: GmailSend::get(http_auth, url),
+            state: State::Send(GmailSend::get(http_auth, url)),
         })
     }
+}
 
-    pub fn resume(&mut self, arg: Option<SocketOutput>) -> GmailLabelsListResult {
-        self.send.resume(arg)
+impl GmailCoroutine for GmailLabelsList {
+    type Yield = GmailYield;
+    type Return = Result<GmailSendOutput<GmailLabelsListResponse>, GmailSendError>;
+
+    fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
+        trace!("labels-list: {}", self.state);
+        match &mut self.state {
+            State::Send(send) => {
+                let out = gmail_try!(send, arg);
+                GmailCoroutineState::Complete(Ok(out))
+            }
+        }
+    }
+}
+
+enum State {
+    Send(GmailSend<GmailLabelsListResponse>),
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Send(_) => f.write_str("send"),
+        }
     }
 }

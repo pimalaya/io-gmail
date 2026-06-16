@@ -1,32 +1,36 @@
+use core::fmt;
+
 use alloc::{
     format,
     string::{String, ToString},
     vec::Vec,
 };
 
+use log::trace;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::{
-    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendResult},
-    types::message::MessageId,
+    coroutine::*,
+    gmail_try,
+    messages::GmailMessageId,
+    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
 };
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GmailMessagesListResponse {
     #[serde(default)]
-    pub messages: Vec<MessageId>,
+    pub messages: Vec<GmailMessageId>,
     #[serde(default)]
     pub next_page_token: Option<String>,
     #[serde(default)]
     pub result_size_estimate: Option<u64>,
 }
 
-pub type GmailMessagesListResult = GmailSendResult<GmailMessagesListResponse>;
-
 pub struct GmailMessagesList {
-    send: GmailSend<GmailMessagesListResponse>,
+    state: State,
 }
 
 impl GmailMessagesList {
@@ -39,8 +43,7 @@ impl GmailMessagesList {
         page_token: Option<&str>,
         include_spam_trash: bool,
     ) -> Result<Self, GmailSendError> {
-        let mut url =
-            url::Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages"))?;
+        let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages"))?;
 
         {
             let mut query = url.query_pairs_mut();
@@ -67,11 +70,34 @@ impl GmailMessagesList {
         }
 
         Ok(Self {
-            send: GmailSend::get(http_auth, url),
+            state: State::Send(GmailSend::get(http_auth, url)),
         })
     }
+}
 
-    pub fn resume(&mut self, arg: Option<io_socket::io::SocketOutput>) -> GmailMessagesListResult {
-        self.send.resume(arg)
+impl GmailCoroutine for GmailMessagesList {
+    type Yield = GmailYield;
+    type Return = Result<GmailSendOutput<GmailMessagesListResponse>, GmailSendError>;
+
+    fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
+        trace!("messages-list: {}", self.state);
+        match &mut self.state {
+            State::Send(send) => {
+                let out = gmail_try!(send, arg);
+                GmailCoroutineState::Complete(Ok(out))
+            }
+        }
+    }
+}
+
+enum State {
+    Send(GmailSend<GmailMessagesListResponse>),
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Send(_) => f.write_str("send"),
+        }
     }
 }

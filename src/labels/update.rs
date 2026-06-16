@@ -1,12 +1,17 @@
+use core::fmt;
+
 use alloc::{format, string::String};
 
-use io_socket::io::SocketOutput;
+use log::trace;
 use secrecy::SecretString;
 use serde::Serialize;
+use url::Url;
 
 use crate::{
-    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendResult},
-    types::label::Label,
+    coroutine::*,
+    gmail_try,
+    labels::GmailLabel,
+    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
 };
 
 #[derive(Debug, Serialize)]
@@ -17,10 +22,8 @@ struct GmailLabelUpdateRequest<'a> {
     message_list_visibility: &'static str,
 }
 
-pub type GmailLabelUpdateResult = GmailSendResult<Label>;
-
 pub struct GmailLabelUpdate {
-    send: GmailSend<Label>,
+    state: State,
 }
 
 impl GmailLabelUpdate {
@@ -32,11 +35,11 @@ impl GmailLabelUpdate {
     ) -> Result<Self, GmailSendError> {
         if name.trim().is_empty() {
             return Err(GmailSendError::InvalidRequest(String::from(
-                "label name cannot be empty",
+                "Label name cannot be empty",
             )));
         }
 
-        let url = url::Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/labels/{id}"))?;
+        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/labels/{id}"))?;
         let body = GmailLabelUpdateRequest {
             name,
             label_list_visibility: "labelShow",
@@ -44,17 +47,34 @@ impl GmailLabelUpdate {
         };
 
         Ok(Self {
-            send: GmailSend::with_method(
-                http_auth,
-                "PATCH",
-                url,
-                Some("application/json"),
-                serde_json::to_vec(&body).map_err(GmailSendError::SerializeRequest)?,
-            ),
+            state: State::Send(GmailSend::patch_json(http_auth, url, &body)?),
         })
     }
+}
 
-    pub fn resume(&mut self, arg: Option<SocketOutput>) -> GmailLabelUpdateResult {
-        self.send.resume(arg)
+impl GmailCoroutine for GmailLabelUpdate {
+    type Yield = GmailYield;
+    type Return = Result<GmailSendOutput<GmailLabel>, GmailSendError>;
+
+    fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
+        trace!("label-update: {}", self.state);
+        match &mut self.state {
+            State::Send(send) => {
+                let out = gmail_try!(send, arg);
+                GmailCoroutineState::Complete(Ok(out))
+            }
+        }
+    }
+}
+
+enum State {
+    Send(GmailSend<GmailLabel>),
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Send(_) => f.write_str("send"),
+        }
     }
 }

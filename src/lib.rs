@@ -2,15 +2,13 @@
 #![no_std]
 
 extern crate alloc;
+#[cfg(feature = "client")]
+extern crate std;
 
-pub mod error;
+#[cfg(feature = "client")]
+pub mod client;
+pub mod coroutine;
 pub mod labels;
 pub mod messages;
 pub mod profile;
 pub mod send;
-pub mod types;
-
-pub use error::*;
-pub use send::{
-    GMAIL_API_BASE, GMAIL_UPLOAD_BASE, GmailSend, GmailSendError, GmailSendResult, NoResponse,
-};

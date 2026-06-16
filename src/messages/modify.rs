@@ -1,12 +1,17 @@
+use core::fmt;
+
 use alloc::{format, string::String};
 
-use io_socket::io::SocketOutput;
+use log::trace;
 use secrecy::SecretString;
 use serde::Serialize;
+use url::Url;
 
 use crate::{
-    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendResult},
-    types::message::Message,
+    coroutine::*,
+    gmail_try,
+    messages::GmailMessage,
+    send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
 };
 
 #[derive(Debug, Serialize)]
@@ -16,10 +21,8 @@ struct GmailMessageModifyRequest<'a> {
     remove_label_ids: &'a [String],
 }
 
-pub type GmailMessageModifyResult = GmailSendResult<Message>;
-
 pub struct GmailMessageModify {
-    send: GmailSend<Message>,
+    state: State,
 }
 
 impl GmailMessageModify {
@@ -32,23 +35,46 @@ impl GmailMessageModify {
     ) -> Result<Self, GmailSendError> {
         if add_label_ids.is_empty() && remove_label_ids.is_empty() {
             return Err(GmailSendError::InvalidRequest(String::from(
-                "modify requires at least one label update",
+                "Modify requires at least one label update",
             )));
         }
 
-        let url = url::Url::parse(GMAIL_API_BASE)?
-            .join(&format!("users/{user_id}/messages/{id}/modify"))?;
+        let url =
+            Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/{id}/modify"))?;
         let body = GmailMessageModifyRequest {
             add_label_ids,
             remove_label_ids,
         };
 
         Ok(Self {
-            send: GmailSend::post_json(http_auth, url, &body)?,
+            state: State::Send(GmailSend::post_json(http_auth, url, &body)?),
         })
     }
+}
 
-    pub fn resume(&mut self, arg: Option<SocketOutput>) -> GmailMessageModifyResult {
-        self.send.resume(arg)
+impl GmailCoroutine for GmailMessageModify {
+    type Yield = GmailYield;
+    type Return = Result<GmailSendOutput<GmailMessage>, GmailSendError>;
+
+    fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
+        trace!("message-modify: {}", self.state);
+        match &mut self.state {
+            State::Send(send) => {
+                let out = gmail_try!(send, arg);
+                GmailCoroutineState::Complete(Ok(out))
+            }
+        }
+    }
+}
+
+enum State {
+    Send(GmailSend<GmailMessage>),
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Send(_) => f.write_str("send"),
+        }
     }
 }

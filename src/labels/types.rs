@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct Label {
+pub struct GmailLabel {
     pub id: String,
     #[serde(default)]
     pub name: String,
@@ -24,5 +24,5 @@ pub struct Label {
 #[serde(rename_all = "camelCase")]
 pub struct GmailLabelsListResponse {
     #[serde(default)]
-    pub labels: Vec<Label>,
+    pub labels: Vec<GmailLabel>,
 }

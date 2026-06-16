@@ -4,7 +4,7 @@ use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
-pub struct MessageId {
+pub struct GmailMessageId {
     pub id: String,
     #[serde(rename = "threadId", default)]
     pub thread_id: Option<String>,
@@ -12,7 +12,7 @@ pub struct MessageId {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct Message {
+pub struct GmailMessage {
     pub id: String,
     #[serde(default)]
     pub thread_id: Option<String>,
@@ -23,7 +23,7 @@ pub struct Message {
     #[serde(default)]
     pub snippet: Option<String>,
     #[serde(default)]
-    pub payload: Option<MessagePayload>,
+    pub payload: Option<GmailMessagePayload>,
     #[serde(default)]
     pub raw: Option<String>,
     #[serde(default)]
@@ -34,18 +34,18 @@ pub struct Message {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct MessagePayload {
+pub struct GmailMessagePayload {
     #[serde(default)]
     pub mime_type: Option<String>,
     #[serde(default)]
     pub filename: String,
     #[serde(default)]
-    pub headers: Vec<MessageHeader>,
+    pub headers: Vec<GmailMessageHeader>,
     #[serde(default)]
-    pub parts: Vec<MessagePayload>,
+    pub parts: Vec<GmailMessagePayload>,
 }
 
-impl MessagePayload {
+impl GmailMessagePayload {
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .iter()
@@ -55,20 +55,20 @@ impl MessagePayload {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
-pub struct MessageHeader {
+pub struct GmailMessageHeader {
     pub name: String,
     pub value: String,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum MessageFormat {
+pub enum GmailMessageFormat {
     Minimal,
     Full,
     Raw,
     Metadata,
 }
 
-impl MessageFormat {
+impl GmailMessageFormat {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Minimal => "MINIMAL",
