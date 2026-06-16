@@ -16,3 +16,4 @@ pub mod profile;
 pub mod send;
 pub mod settings;
 pub mod threads;
+pub mod watch;
