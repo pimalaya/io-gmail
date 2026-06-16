@@ -7,5 +7,6 @@
 #[cfg(feature = "client")]
 pub mod client;
 pub mod history_poll;
+pub mod query;
 pub mod rest;
 pub mod send;

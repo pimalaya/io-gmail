@@ -1,10 +1,6 @@
 //! List the Gmail drafts (`users.drafts.list`).
 
-use alloc::{
-    format,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{format, string::String, vec::Vec};
 
 use log::{debug, trace};
 use secrecy::SecretString;
@@ -15,17 +11,20 @@ use crate::{
     coroutine::*,
     gmail_try,
     v1::{
+        query::to_query_pairs,
         rest::drafts::GmailDraft,
         send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
     },
 };
 
 /// Query parameters for listing drafts (`users.drafts.list`).
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct GmailDraftsListParams<'a> {
     pub q: Option<&'a str>,
     pub max_results: Option<u32>,
     pub page_token: Option<&'a str>,
+    #[serde(skip_serializing_if = "crate::v1::query::is_false")]
     pub include_spam_trash: bool,
 }
 
@@ -55,26 +54,7 @@ impl GmailDraftsList {
         trace!("params: {params:?}");
 
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/drafts"))?;
-
-        {
-            let mut query = url.query_pairs_mut();
-
-            if let Some(q) = params.q.filter(|q| !q.trim().is_empty()) {
-                query.append_pair("q", q);
-            }
-
-            if let Some(max_results) = params.max_results {
-                query.append_pair("maxResults", &max_results.min(500).to_string());
-            }
-
-            if let Some(page_token) = params.page_token {
-                query.append_pair("pageToken", page_token);
-            }
-
-            if params.include_spam_trash {
-                query.append_pair("includeSpamTrash", "true");
-            }
-        }
+        url.query_pairs_mut().extend_pairs(to_query_pairs(params));
 
         let send = GmailSend::get(http_auth, url);
 

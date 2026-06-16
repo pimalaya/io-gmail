@@ -44,9 +44,9 @@ use crate::{
     },
     v1::rest::messages::{
         GmailMessage, GmailMessageFormat, GmailMessageId, delete::GmailMessageDelete,
-        get::GmailMessageGet, list::GmailMessagesList, list::GmailMessagesListResponse,
-        modify::GmailMessageModify, send::GmailMessageSend, trash::GmailMessageTrash,
-        untrash::GmailMessageUntrash,
+        get::GmailMessageGet, list::GmailMessagesList, list::GmailMessagesListParams,
+        list::GmailMessagesListResponse, modify::GmailMessageModify, send::GmailMessageSend,
+        trash::GmailMessageTrash, untrash::GmailMessageUntrash,
     },
     v1::rest::users::{
         GmailProfile, GmailWatchRequest, GmailWatchResponse, get_profile::GmailProfileGet,
@@ -234,24 +234,11 @@ impl GmailClientStd {
         self.run(coroutine)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn messages_list(
         &mut self,
-        q: Option<&str>,
-        label_ids: &[String],
-        max_results: Option<u32>,
-        page_token: Option<&str>,
-        include_spam_trash: bool,
+        params: &GmailMessagesListParams,
     ) -> Result<GmailSendOutput<GmailMessagesListResponse>, GmailClientStdError> {
-        let coroutine = GmailMessagesList::new(
-            &self.http_auth,
-            &self.user_id,
-            q,
-            label_ids,
-            max_results,
-            page_token,
-            include_spam_trash,
-        )?;
+        let coroutine = GmailMessagesList::new(&self.http_auth, &self.user_id, params)?;
         self.run(coroutine)
     }
 

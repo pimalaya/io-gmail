@@ -1,10 +1,6 @@
 //! List the Gmail messages (`users.messages.list`).
 
-use alloc::{
-    format,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{format, string::String, vec::Vec};
 
 use log::{debug, trace};
 use secrecy::SecretString;
@@ -15,10 +11,23 @@ use crate::{
     coroutine::*,
     gmail_try,
     v1::{
+        query::to_query_pairs,
         rest::messages::GmailMessageId,
         send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
     },
 };
+
+/// Query parameters for listing messages (`users.messages.list`).
+#[derive(Debug, Clone, Default, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GmailMessagesListParams<'a> {
+    pub q: Option<&'a str>,
+    pub label_ids: &'a [String],
+    pub max_results: Option<u32>,
+    pub page_token: Option<&'a str>,
+    #[serde(skip_serializing_if = "crate::v1::query::is_false")]
+    pub include_spam_trash: bool,
+}
 
 /// Gmail REST message listing response (one page of message ids).
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Eq, PartialEq)]
@@ -41,41 +50,13 @@ impl GmailMessagesList {
     pub fn new(
         http_auth: &SecretString,
         user_id: &str,
-        q: Option<&str>,
-        label_ids: &[String],
-        max_results: Option<u32>,
-        page_token: Option<&str>,
-        include_spam_trash: bool,
+        params: &GmailMessagesListParams,
     ) -> Result<Self, GmailSendError> {
         debug!("prepare gmail messages listing");
-        trace!("q: {q:?}");
-        trace!("label_ids: {label_ids:?}");
+        trace!("params: {params:?}");
 
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages"))?;
-
-        {
-            let mut query = url.query_pairs_mut();
-
-            if let Some(q) = q.filter(|q| !q.trim().is_empty()) {
-                query.append_pair("q", q);
-            }
-
-            for label_id in label_ids {
-                query.append_pair("labelIds", label_id);
-            }
-
-            if let Some(max_results) = max_results {
-                query.append_pair("maxResults", &max_results.min(500).to_string());
-            }
-
-            if let Some(page_token) = page_token {
-                query.append_pair("pageToken", page_token);
-            }
-
-            if include_spam_trash {
-                query.append_pair("includeSpamTrash", "true");
-            }
-        }
+        url.query_pairs_mut().extend_pairs(to_query_pairs(params));
 
         let send = GmailSend::get(http_auth, url);
 

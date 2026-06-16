@@ -1,28 +1,25 @@
 //! List the Gmail history records (`users.history.list`).
 
-use alloc::{
-    format,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{format, string::String, vec::Vec};
 
 use log::{debug, trace};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
-use serde_variant::to_variant_name;
 use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
     v1::{
+        query::to_query_pairs,
         rest::history::{GmailHistory, GmailHistoryType},
         send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
     },
 };
 
 /// Query parameters for listing history records (`users.history.list`).
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct GmailHistoryListParams<'a> {
     pub start_history_id: &'a str,
     pub label_id: Option<&'a str>,
@@ -57,29 +54,7 @@ impl GmailHistoryList {
         trace!("params: {params:?}");
 
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/history"))?;
-
-        {
-            let mut query = url.query_pairs_mut();
-
-            query.append_pair("startHistoryId", params.start_history_id);
-
-            if let Some(max_results) = params.max_results {
-                query.append_pair("maxResults", &max_results.min(500).to_string());
-            }
-
-            if let Some(page_token) = params.page_token {
-                query.append_pair("pageToken", page_token);
-            }
-
-            if let Some(label_id) = params.label_id {
-                query.append_pair("labelId", label_id);
-            }
-
-            for history_type in params.history_types {
-                let value = to_variant_name(history_type).unwrap_or_default();
-                query.append_pair("historyTypes", value);
-            }
-        }
+        url.query_pairs_mut().extend_pairs(to_query_pairs(params));
 
         let send = GmailSend::get(http_auth, url);
 

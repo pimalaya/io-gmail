@@ -23,7 +23,7 @@ use io_gmail::v1::{
     client::GmailClientStd,
     rest::{
         labels::GmailLabel,
-        messages::{GmailMessage, GmailMessageFormat, encode_raw},
+        messages::{GmailMessage, GmailMessageFormat, encode_raw, list::GmailMessagesListParams},
     },
     send::GMAIL_API_BASE,
 };
@@ -145,7 +145,12 @@ fn gmail() {
     // ── MESSAGES LIST (find the sent message) ────────────────────────────────
 
     let listed = client
-        .messages_list(Some("subject:io-gmail"), &[], Some(10), None, true)
+        .messages_list(&GmailMessagesListParams {
+            q: Some("subject:io-gmail"),
+            max_results: Some(10),
+            include_spam_trash: true,
+            ..Default::default()
+        })
         .expect("messages list")
         .response;
     assert!(

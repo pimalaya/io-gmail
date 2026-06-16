@@ -1,6 +1,7 @@
 mod common;
 
 use io_gmail::v1::{
+    query::to_query_pairs,
     rest::{
         labels::{
             GmailLabel, GmailLabelListVisibility, create::GmailLabelCreate,
@@ -173,4 +174,40 @@ fn round_trips_raw_messages() {
 fn decodes_padded_and_wrapped_raw_messages() {
     assert_eq!(decode_raw("SGVsbG8=").unwrap(), b"Hello");
     assert_eq!(decode_raw("SGVs\nbG8=\r\n").unwrap(), b"Hello");
+}
+
+#[test]
+fn serializes_params_into_query_pairs() {
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Params<'a> {
+        q: Option<&'a str>,
+        page_token: Option<&'a str>,
+        label_ids: &'a [&'a str],
+        max_results: Option<u32>,
+        #[serde(skip_serializing_if = "io_gmail::v1::query::is_false")]
+        include_spam_trash: bool,
+    }
+
+    let params = Params {
+        q: Some("is:unread"),
+        page_token: None,
+        label_ids: &["INBOX", "UNREAD"],
+        max_results: Some(10),
+        include_spam_trash: false,
+    };
+
+    let pairs = to_query_pairs(&params);
+
+    // None and the false flag vanish; the slice expands into one
+    // repeated key per element; field names come from the serde rename.
+    assert_eq!(
+        pairs,
+        vec![
+            ("q".to_string(), "is:unread".to_string()),
+            ("labelIds".to_string(), "INBOX".to_string()),
+            ("labelIds".to_string(), "UNREAD".to_string()),
+            ("maxResults".to_string(), "10".to_string()),
+        ],
+    );
 }
