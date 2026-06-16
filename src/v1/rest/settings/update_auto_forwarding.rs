@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailAutoForwardingUpdate {
         user_id: &str,
         settings: GmailAutoForwarding,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail auto-forwarding settings update");
+        debug!("prepare gmail auto-forwarding settings update");
+        trace!("settings: {settings:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?
             .join(&format!("users/{user_id}/settings/autoForwarding"))?;
@@ -39,7 +40,8 @@ impl GmailCoroutine for GmailAutoForwardingUpdate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail auto-forwarding settings updated: {out:?}");
+        debug!("gmail auto-forwarding settings updated");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

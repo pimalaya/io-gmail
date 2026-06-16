@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -20,7 +20,8 @@ impl GmailForwardingAddressDelete {
         user_id: &str,
         forwarding_email: &str,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail forwarding address {forwarding_email} deletion");
+        debug!("prepare gmail forwarding address deletion");
+        trace!("forwarding_email: {forwarding_email:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
             "users/{user_id}/settings/forwardingAddresses/{forwarding_email}"
@@ -37,7 +38,8 @@ impl GmailCoroutine for GmailForwardingAddressDelete {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail forwarding address deleted: {out:?}");
+        debug!("gmail forwarding address deleted");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

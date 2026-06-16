@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailLabelPatch {
         user_id: &str,
         label: &GmailLabel,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail label {} patch", label.id);
+        debug!("prepare gmail label patch");
+        trace!("label: {label:?}");
 
         let id = &label.id;
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/labels/{id}"))?;
@@ -39,7 +40,8 @@ impl GmailCoroutine for GmailLabelPatch {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail label patched: {out:?}");
+        debug!("gmail label patched");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

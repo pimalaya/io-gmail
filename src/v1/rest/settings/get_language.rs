@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -19,7 +19,8 @@ pub struct GmailLanguageGet {
 
 impl GmailLanguageGet {
     pub fn new(http_auth: &SecretString, user_id: &str) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail language settings retrieval");
+        debug!("prepare gmail language settings retrieval");
+        trace!("user_id: {user_id:?}");
 
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/language"))?;
@@ -35,7 +36,8 @@ impl GmailCoroutine for GmailLanguageGet {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail language settings retrieved: {out:?}");
+        debug!("gmail language settings retrieved");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

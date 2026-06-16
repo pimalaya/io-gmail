@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailLanguageUpdate {
         user_id: &str,
         settings: GmailLanguageSettings,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail language settings update");
+        debug!("prepare gmail language settings update");
+        trace!("settings: {settings:?}");
 
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/language"))?;
@@ -39,7 +40,8 @@ impl GmailCoroutine for GmailLanguageUpdate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail language settings updated: {out:?}");
+        debug!("gmail language settings updated");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

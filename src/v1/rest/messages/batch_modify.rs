@@ -1,6 +1,6 @@
 use alloc::{format, string::String};
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use serde::Serialize;
 use url::Url;
@@ -32,7 +32,10 @@ impl GmailMessageBatchModify {
         add_label_ids: &[String],
         remove_label_ids: &[String],
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail messages batch modification");
+        debug!("prepare gmail messages batch modification");
+        trace!("ids: {ids:?}");
+        trace!("add_label_ids: {add_label_ids:?}");
+        trace!("remove_label_ids: {remove_label_ids:?}");
 
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/batchModify"))?;
@@ -53,7 +56,8 @@ impl GmailCoroutine for GmailMessageBatchModify {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail messages batch modified: {out:?}");
+        debug!("gmail messages batch modified");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

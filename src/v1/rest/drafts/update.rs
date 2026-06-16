@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -24,8 +24,10 @@ impl GmailDraftUpdate {
         user_id: &str,
         draft: &GmailDraft,
     ) -> Result<Self, GmailSendError> {
+        debug!("prepare gmail draft update");
+        trace!("draft: {draft:?}");
+
         let id = &draft.id;
-        trace!("prepare gmail draft {id} update");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/drafts/{id}"))?;
         let send = GmailSend::put_json(http_auth, url, draft)?;
@@ -40,7 +42,8 @@ impl GmailCoroutine for GmailDraftUpdate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail draft updated: {out:?}");
+        debug!("gmail draft updated");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

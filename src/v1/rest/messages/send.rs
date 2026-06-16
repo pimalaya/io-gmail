@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -22,7 +22,8 @@ impl GmailMessageSend {
         user_id: &str,
         message: &GmailMessage,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail message send");
+        debug!("prepare gmail message send");
+        trace!("message: {message:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/send"))?;
         let send = GmailSend::post_json(http_auth, url, message)?;
@@ -37,7 +38,8 @@ impl GmailCoroutine for GmailMessageSend {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail message sent: {out:?}");
+        debug!("gmail message sent");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

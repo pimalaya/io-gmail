@@ -8,38 +8,38 @@ use crate::{
     coroutine::*,
     gmail_try,
     v1::{
-        rest::settings::filters::GmailFilter,
+        rest::users::{GmailWatchRequest, GmailWatchResponse},
         send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
     },
 };
 
-pub struct GmailFilterCreate {
-    send: GmailSend<GmailFilter>,
+pub struct GmailWatch {
+    send: GmailSend<GmailWatchResponse>,
 }
 
-impl GmailFilterCreate {
+impl GmailWatch {
     pub fn new(
         http_auth: &SecretString,
         user_id: &str,
-        filter: &GmailFilter,
+        request: &GmailWatchRequest,
     ) -> Result<Self, GmailSendError> {
-        debug!("prepare gmail filter creation");
-        trace!("filter: {filter:?}");
+        debug!("prepare gmail watch");
+        trace!("request: {request:?}");
 
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/filters"))?;
-        let send = GmailSend::post_json(http_auth, url, filter)?;
+        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/watch"))?;
+        let send = GmailSend::post_json(http_auth, url, request)?;
 
         Ok(Self { send })
     }
 }
 
-impl GmailCoroutine for GmailFilterCreate {
+impl GmailCoroutine for GmailWatch {
     type Yield = GmailYield;
-    type Return = Result<GmailSendOutput<GmailFilter>, GmailSendError>;
+    type Return = Result<GmailSendOutput<GmailWatchResponse>, GmailSendError>;
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        debug!("gmail filter created");
+        debug!("gmail watch established");
         trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }

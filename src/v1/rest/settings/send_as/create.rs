@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailSendAsCreate {
         user_id: &str,
         send_as: &GmailSendAs,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail send-as alias creation");
+        debug!("prepare gmail send-as alias creation");
+        trace!("send_as: {send_as:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/sendAs"))?;
         let send = GmailSend::post_json(http_auth, url, send_as)?;
@@ -38,7 +39,8 @@ impl GmailCoroutine for GmailSendAsCreate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail send-as alias created: {out:?}");
+        debug!("gmail send-as alias created");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

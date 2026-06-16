@@ -1,6 +1,6 @@
 use alloc::{format, vec::Vec};
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -20,7 +20,8 @@ impl GmailSendAsVerify {
         user_id: &str,
         send_as_email: &str,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail send-as alias {send_as_email} verification");
+        debug!("prepare gmail send-as alias verification");
+        trace!("send_as_email: {send_as_email:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
             "users/{user_id}/settings/sendAs/{send_as_email}/verify"
@@ -37,7 +38,8 @@ impl GmailCoroutine for GmailSendAsVerify {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail send-as alias verification requested: {out:?}");
+        debug!("gmail send-as alias verification requested");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

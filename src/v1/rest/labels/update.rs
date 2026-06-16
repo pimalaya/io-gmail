@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailLabelUpdate {
         user_id: &str,
         label: &GmailLabel,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail label {} update", label.id);
+        debug!("prepare gmail label update");
+        trace!("label: {label:?}");
 
         if label.name.trim().is_empty() {
             let err = GmailSendError::InvalidRequest("Label name cannot be empty".into());
@@ -44,7 +45,8 @@ impl GmailCoroutine for GmailLabelUpdate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail label updated: {out:?}");
+        debug!("gmail label updated");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

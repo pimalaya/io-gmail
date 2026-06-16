@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailLabelCreate {
         user_id: &str,
         label: &GmailLabel,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail label {} for creation", label.name);
+        debug!("prepare gmail label for creation");
+        trace!("label: {label:?}");
 
         if label.name.trim().is_empty() {
             let err = GmailSendError::InvalidRequest("Label name cannot be empty".into());
@@ -43,7 +44,8 @@ impl GmailCoroutine for GmailLabelCreate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail label created: {out:?}");
+        debug!("gmail label created");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

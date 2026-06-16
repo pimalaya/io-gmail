@@ -37,7 +37,6 @@ use url::Url;
 
 use crate::{
     coroutine::*,
-    v1::rest::get_profile::{GmailProfile, GmailProfileGet},
     v1::rest::labels::{
         GmailLabel, GmailLabelsListResponse, create::GmailLabelCreate, delete::GmailLabelDelete,
         get::GmailLabelGet, list::GmailLabelsList, patch::GmailLabelPatch,
@@ -48,6 +47,10 @@ use crate::{
         get::GmailMessageGet, list::GmailMessagesList, list::GmailMessagesListResponse,
         modify::GmailMessageModify, send::GmailMessageSend, trash::GmailMessageTrash,
         untrash::GmailMessageUntrash,
+    },
+    v1::rest::users::{
+        GmailProfile, GmailWatchRequest, GmailWatchResponse, get_profile::GmailProfileGet,
+        stop::GmailStop, watch::GmailWatch,
     },
     v1::send::{GmailNoResponse, GmailSendError, GmailSendOutput},
 };
@@ -168,6 +171,19 @@ impl GmailClientStd {
 
     pub fn profile_get(&mut self) -> Result<GmailSendOutput<GmailProfile>, GmailClientStdError> {
         let coroutine = GmailProfileGet::new(&self.http_auth, &self.user_id)?;
+        self.run(coroutine)
+    }
+
+    pub fn watch(
+        &mut self,
+        request: &GmailWatchRequest,
+    ) -> Result<GmailSendOutput<GmailWatchResponse>, GmailClientStdError> {
+        let coroutine = GmailWatch::new(&self.http_auth, &self.user_id, request)?;
+        self.run(coroutine)
+    }
+
+    pub fn stop(&mut self) -> Result<GmailSendOutput<GmailNoResponse>, GmailClientStdError> {
+        let coroutine = GmailStop::new(&self.http_auth, &self.user_id)?;
         self.run(coroutine)
     }
 

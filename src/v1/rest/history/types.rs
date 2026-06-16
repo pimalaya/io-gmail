@@ -43,9 +43,3 @@ pub enum GmailHistoryType {
     LabelAdded,
     LabelRemoved,
 }
-
-impl GmailHistoryType {
-    pub fn as_str(self) -> &'static str {
-        serde_variant::to_variant_name(&self).unwrap_or_default()
-    }
-}

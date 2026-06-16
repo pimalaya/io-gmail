@@ -14,9 +14,12 @@ use thiserror::Error;
 
 use crate::{
     coroutine::{GmailCoroutine, GmailCoroutineState, GmailYield},
-    v1::rest::get_profile::GmailProfileGet,
-    v1::rest::history::{GmailHistoryLabel, list::GmailHistoryList},
+    v1::rest::history::{
+        GmailHistoryLabel,
+        list::{GmailHistoryList, GmailHistoryListParams},
+    },
     v1::rest::messages::{GmailMessage, GmailMessageFormat, GmailMessageId, get::GmailMessageGet},
+    v1::rest::users::get_profile::GmailProfileGet,
     v1::send::GmailSendError,
 };
 
@@ -71,16 +74,14 @@ impl GmailHistoryPoll {
     }
 
     fn history_list(&self, page_token: Option<&str>) -> Result<GmailHistoryList, GmailSendError> {
-        let since = self.history_id.as_deref().unwrap_or_default();
-        GmailHistoryList::new(
-            &self.http_auth,
-            &self.user_id,
-            since,
-            Some(&self.mailbox),
-            &[],
-            None,
+        let params = GmailHistoryListParams {
+            start_history_id: self.history_id.as_deref().unwrap_or_default(),
+            label_id: Some(&self.mailbox),
+            history_types: &[],
+            max_results: None,
             page_token,
-        )
+        };
+        GmailHistoryList::new(&self.http_auth, &self.user_id, &params)
     }
 
     fn message_get(&self, id: &str) -> Result<GmailMessageGet, GmailSendError> {

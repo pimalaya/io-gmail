@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailDelegateCreate {
         user_id: &str,
         delegate: &GmailDelegate,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail delegate creation");
+        debug!("prepare gmail delegate creation");
+        trace!("delegate: {delegate:?}");
 
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/delegates"))?;
@@ -39,7 +40,8 @@ impl GmailCoroutine for GmailDelegateCreate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail delegate created: {out:?}");
+        debug!("gmail delegate created");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

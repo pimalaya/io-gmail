@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -17,7 +17,8 @@ pub struct GmailMessageDelete {
 
 impl GmailMessageDelete {
     pub fn new(http_auth: &SecretString, user_id: &str, id: &str) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail message {id} deletion");
+        debug!("prepare gmail message deletion");
+        trace!("id: {id:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/{id}"))?;
         let send = GmailSend::delete(http_auth, url);
@@ -32,7 +33,8 @@ impl GmailCoroutine for GmailMessageDelete {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail message deleted: {out:?}");
+        debug!("gmail message deleted");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

@@ -1,6 +1,6 @@
 use alloc::{format, vec::Vec};
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -18,7 +18,8 @@ pub struct GmailThreadTrash {
 
 impl GmailThreadTrash {
     pub fn new(http_auth: &SecretString, user_id: &str, id: &str) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail thread {id} trashing");
+        debug!("prepare gmail thread trashing");
+        trace!("id: {id:?}");
 
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/threads/{id}/trash"))?;
@@ -34,7 +35,8 @@ impl GmailCoroutine for GmailThreadTrash {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail thread trashed: {out:?}");
+        debug!("gmail thread trashed");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

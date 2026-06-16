@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailForwardingAddressCreate {
         user_id: &str,
         address: &GmailForwardingAddress,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail forwarding address creation");
+        debug!("prepare gmail forwarding address creation");
+        trace!("address: {address:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?
             .join(&format!("users/{user_id}/settings/forwardingAddresses"))?;
@@ -39,7 +40,8 @@ impl GmailCoroutine for GmailForwardingAddressCreate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail forwarding address created: {out:?}");
+        debug!("gmail forwarding address created");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

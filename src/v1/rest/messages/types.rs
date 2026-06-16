@@ -86,7 +86,8 @@ pub enum GmailMessageListVisibility {
 }
 
 /// Amount of message detail to return (`format` query parameter).
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GmailMessageFormat {
     Minimal,
     Full,
@@ -94,32 +95,13 @@ pub enum GmailMessageFormat {
     Metadata,
 }
 
-impl GmailMessageFormat {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Minimal => "MINIMAL",
-            Self::Full => "FULL",
-            Self::Raw => "RAW",
-            Self::Metadata => "METADATA",
-        }
-    }
-}
-
 /// Source of the internal date when importing or inserting a message
 /// (`internalDateSource` query parameter).
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GmailInternalDateSource {
     ReceivedTime,
     DateHeader,
-}
-
-impl GmailInternalDateSource {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::ReceivedTime => "RECEIVED_TIME",
-            Self::DateHeader => "DATE_HEADER",
-        }
-    }
 }
 
 pub fn decode_raw(raw: &str) -> Result<Vec<u8>, base64::DecodeError> {

@@ -1,6 +1,6 @@
 use alloc::{format, string::String};
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use serde::Serialize;
 use url::Url;
@@ -32,7 +32,9 @@ impl GmailThreadModify {
         add_label_ids: &[String],
         remove_label_ids: &[String],
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail thread {id} modification");
+        debug!("prepare gmail thread modification");
+        trace!("add_label_ids: {add_label_ids:?}");
+        trace!("remove_label_ids: {remove_label_ids:?}");
 
         if add_label_ids.is_empty() && remove_label_ids.is_empty() {
             return Err(GmailSendError::InvalidRequest(String::from(
@@ -58,7 +60,8 @@ impl GmailCoroutine for GmailThreadModify {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail thread modified: {out:?}");
+        debug!("gmail thread modified");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

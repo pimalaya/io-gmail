@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,9 @@ impl GmailAttachmentGet {
         message_id: &str,
         id: &str,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail attachment {id} retrieval");
+        debug!("prepare gmail attachment retrieval");
+        trace!("message_id: {message_id:?}");
+        trace!("id: {id:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
             "users/{user_id}/messages/{message_id}/attachments/{id}"
@@ -40,7 +42,8 @@ impl GmailCoroutine for GmailAttachmentGet {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail attachment retrieved: {out:?}");
+        debug!("gmail attachment retrieved");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

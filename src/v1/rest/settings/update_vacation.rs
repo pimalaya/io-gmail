@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailVacationUpdate {
         user_id: &str,
         settings: GmailVacationSettings,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail vacation settings update");
+        debug!("prepare gmail vacation settings update");
+        trace!("settings: {settings:?}");
 
         let url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/vacation"))?;
@@ -39,7 +40,8 @@ impl GmailCoroutine for GmailVacationUpdate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail vacation settings updated: {out:?}");
+        debug!("gmail vacation settings updated");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

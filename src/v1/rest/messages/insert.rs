@@ -1,7 +1,8 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
+use serde_variant::to_variant_name;
 use url::Url;
 
 use crate::{
@@ -24,15 +25,19 @@ impl GmailMessageInsert {
         internal_date_source: Option<GmailInternalDateSource>,
         deleted: bool,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail message insertion");
+        debug!("prepare gmail message insertion");
+        trace!("message: {message:?}");
 
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages"))?;
 
         {
             let mut query = url.query_pairs_mut();
 
-            if let Some(internal_date_source) = internal_date_source {
-                query.append_pair("internalDateSource", internal_date_source.as_str());
+            if let Some(ids) = internal_date_source {
+                query.append_pair(
+                    "internalDateSource",
+                    to_variant_name(&ids).unwrap_or_default(),
+                );
             }
 
             if deleted {
@@ -52,7 +57,8 @@ impl GmailCoroutine for GmailMessageInsert {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail message inserted: {out:?}");
+        debug!("gmail message inserted");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

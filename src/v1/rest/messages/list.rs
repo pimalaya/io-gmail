@@ -4,7 +4,7 @@ use alloc::{
     vec::Vec,
 };
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -43,7 +43,9 @@ impl GmailMessagesList {
         page_token: Option<&str>,
         include_spam_trash: bool,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail messages listing");
+        debug!("prepare gmail messages listing");
+        trace!("q: {q:?}");
+        trace!("label_ids: {label_ids:?}");
 
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages"))?;
 
@@ -83,7 +85,8 @@ impl GmailCoroutine for GmailMessagesList {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail messages listed: {out:?}");
+        debug!("gmail messages listed");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

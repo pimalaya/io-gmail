@@ -1,6 +1,6 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
 use url::Url;
 
@@ -23,7 +23,8 @@ impl GmailPopUpdate {
         user_id: &str,
         settings: GmailPopSettings,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail pop settings update");
+        debug!("prepare gmail pop settings update");
+        trace!("settings: {settings:?}");
 
         let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/settings/pop"))?;
         let send = GmailSend::put_json(http_auth, url, &settings)?;
@@ -38,7 +39,8 @@ impl GmailCoroutine for GmailPopUpdate {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail pop settings updated: {out:?}");
+        debug!("gmail pop settings updated");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }

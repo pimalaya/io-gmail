@@ -2,12 +2,12 @@ mod common;
 
 use io_gmail::v1::{
     rest::{
-        get_profile::GmailProfileGet,
         labels::{
             GmailLabel, GmailLabelListVisibility, create::GmailLabelCreate,
             delete::GmailLabelDelete, list::GmailLabelsList, patch::GmailLabelPatch,
         },
         messages::{GmailMessageListVisibility, decode_raw, encode_raw},
+        users::get_profile::GmailProfileGet,
     },
     send::{GmailSendError, parse_api_error},
 };

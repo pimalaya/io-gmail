@@ -1,7 +1,8 @@
 use alloc::format;
 
-use log::trace;
+use log::{debug, trace};
 use secrecy::SecretString;
+use serde_variant::to_variant_name;
 use url::Url;
 
 use crate::{
@@ -25,13 +26,14 @@ impl GmailDraftGet {
         id: &str,
         format: GmailMessageFormat,
     ) -> Result<Self, GmailSendError> {
-        trace!("prepare gmail draft {id} retrieval");
+        debug!("prepare gmail draft retrieval");
+        trace!("id: {id:?}");
 
         let mut url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/drafts/{id}"))?;
 
         {
             let mut query = url.query_pairs_mut();
-            query.append_pair("format", format.as_str());
+            query.append_pair("format", to_variant_name(&format).unwrap_or_default());
         }
 
         let send = GmailSend::get(http_auth, url);
@@ -46,7 +48,8 @@ impl GmailCoroutine for GmailDraftGet {
 
     fn resume(&mut self, arg: Option<&[u8]>) -> GmailCoroutineState<Self::Yield, Self::Return> {
         let out = gmail_try!(&mut self.send, arg);
-        trace!("gmail draft retrieved: {out:?}");
+        debug!("gmail draft retrieved");
+        trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
     }
 }
