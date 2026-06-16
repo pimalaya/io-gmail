@@ -2,6 +2,8 @@
 
 Gmail REST API client library, written in Rust.
 
+https://developers.google.com/workspace/gmail/api/reference/rest
+
 ## Table of contents
 
 - [Usage](#usage)
@@ -18,6 +20,8 @@ I/O Gmail can be consumed three ways, depending on how much of the I/O stack you
 
 > [!TIP]
 > I/O Gmail is written in [Rust](https://www.rust-lang.org/) and uses [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to gate the client layers. The default feature set is declared in [Cargo.toml](./Cargo.toml) or on [docs.rs](https://docs.rs/crate/io-gmail/latest/features).
+
+### Full client
 
 If you want a ready-to-use, standard, blocking client with TCP connection and TLS negociation managed for you:
 
@@ -39,6 +43,8 @@ for label in &out.response.labels {
     println!("{}: {}", label.id, label.name);
 }
 ```
+
+### Light client
 
 If you still want a standard, blocking client but you want to manage TCP and TLS on your own:
 
@@ -74,6 +80,8 @@ for label in &out.response.labels {
     println!("{}: {}", label.id, label.name);
 }
 ```
+
+### Coroutines
 
 Otherwise you can build your own client using I/O-free coroutines directly:
 
