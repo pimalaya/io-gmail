@@ -1,16 +1,15 @@
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![no_std]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![doc = include_str!("../README.md")]
+
+//! I/O-free coroutines for the Gmail REST API.
+//!
+//! Each module mirrors a Gmail API resource; see the reference at
+//! <https://developers.google.com/gmail/api/reference/rest>.
 
 extern crate alloc;
+#[cfg(feature = "client")]
+extern crate std;
 
-pub mod error;
-pub mod labels;
-pub mod messages;
-pub mod profile;
-pub mod send;
-pub mod types;
-
-pub use error::*;
-pub use send::{
-    GMAIL_API_BASE, GMAIL_UPLOAD_BASE, GmailSend, GmailSendError, GmailSendResult, NoResponse,
-};
+pub mod coroutine;
+pub mod v1;
