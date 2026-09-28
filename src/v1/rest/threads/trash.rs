@@ -11,8 +11,10 @@ use url::Url;
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::rest::threads::GmailThread,
-    v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    v1::{
+        rest::threads::GmailThread,
+        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    },
 };
 
 /// Gmail REST thread trashing, wrapping the updated `GmailThread`.

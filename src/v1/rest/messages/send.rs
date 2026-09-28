@@ -11,8 +11,10 @@ use url::Url;
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::rest::messages::{GmailMessage, GmailMessageId},
-    v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    v1::{
+        rest::messages::{GmailMessage, GmailMessageId},
+        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    },
 };
 
 /// Gmail REST message send, wrapping the resulting `GmailMessageId`.

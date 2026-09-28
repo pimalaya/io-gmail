@@ -43,27 +43,35 @@ use url::Url;
 use crate::v1::send::GMAIL_API_BASE;
 use crate::{
     coroutine::*,
-    v1::rest::labels::{
-        GmailLabel,
-        create::GmailLabelCreate,
-        delete::GmailLabelDelete,
-        get::GmailLabelGet,
-        list::{GmailLabelsList, GmailLabelsListResponse},
-        patch::GmailLabelPatch,
-        update::GmailLabelUpdate,
+    v1::{
+        rest::{
+            labels::{
+                GmailLabel,
+                create::GmailLabelCreate,
+                delete::GmailLabelDelete,
+                get::GmailLabelGet,
+                list::{GmailLabelsList, GmailLabelsListResponse},
+                patch::GmailLabelPatch,
+                update::GmailLabelUpdate,
+            },
+            messages::{
+                GmailMessage, GmailMessageFormat, GmailMessageId,
+                delete::GmailMessageDelete,
+                get::GmailMessageGet,
+                list::{GmailMessagesList, GmailMessagesListParams, GmailMessagesListResponse},
+                modify::GmailMessageModify,
+                send::GmailMessageSend,
+                trash::GmailMessageTrash,
+                untrash::GmailMessageUntrash,
+            },
+            users::{
+                get_profile::{GmailProfile, GmailProfileGet},
+                stop::GmailStop,
+                watch::{GmailWatch, GmailWatchRequest, GmailWatchResponse},
+            },
+        },
+        send::{GmailNoResponse, GmailSendError, GmailSendOutput},
     },
-    v1::rest::messages::{
-        GmailMessage, GmailMessageFormat, GmailMessageId, delete::GmailMessageDelete,
-        get::GmailMessageGet, list::GmailMessagesList, list::GmailMessagesListParams,
-        list::GmailMessagesListResponse, modify::GmailMessageModify, send::GmailMessageSend,
-        trash::GmailMessageTrash, untrash::GmailMessageUntrash,
-    },
-    v1::rest::users::{
-        get_profile::{GmailProfile, GmailProfileGet},
-        stop::GmailStop,
-        watch::{GmailWatch, GmailWatchRequest, GmailWatchResponse},
-    },
-    v1::send::{GmailNoResponse, GmailSendError, GmailSendOutput},
 };
 
 /// Errors that can occur on the std client.

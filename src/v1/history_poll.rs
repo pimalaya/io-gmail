@@ -16,13 +16,17 @@ use thiserror::Error;
 
 use crate::{
     coroutine::*,
-    v1::rest::history::{
-        GmailHistoryLabel,
-        list::{GmailHistoryList, GmailHistoryListParams},
+    v1::{
+        rest::{
+            history::{
+                GmailHistoryLabel,
+                list::{GmailHistoryList, GmailHistoryListParams},
+            },
+            messages::{GmailMessage, GmailMessageFormat, GmailMessageId, get::GmailMessageGet},
+            users::get_profile::GmailProfileGet,
+        },
+        send::GmailSendError,
     },
-    v1::rest::messages::{GmailMessage, GmailMessageFormat, GmailMessageId, get::GmailMessageGet},
-    v1::rest::users::get_profile::GmailProfileGet,
-    v1::send::GmailSendError,
 };
 
 const POLL_SECONDS: u64 = 30;

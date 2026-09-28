@@ -6,13 +6,13 @@ use alloc::format;
 
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use serde_variant::to_variant_name;
 use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
     v1::{
+        query::to_field_pairs,
         rest::{drafts::GmailDraft, messages::GmailMessageFormat},
         send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
     },
@@ -39,7 +39,7 @@ impl GmailDraftGet {
 
         {
             let mut query = url.query_pairs_mut();
-            query.append_pair("format", to_variant_name(&format).unwrap_or_default());
+            query.extend_pairs(to_field_pairs("format", &format));
         }
 
         let send = GmailSend::get(auth, url);

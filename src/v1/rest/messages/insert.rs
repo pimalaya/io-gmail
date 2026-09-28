@@ -6,14 +6,16 @@ use alloc::format;
 
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use serde_variant::to_variant_name;
 use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::rest::messages::{GmailInternalDateSource, GmailMessage},
-    v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    v1::{
+        query::to_field_pairs,
+        rest::messages::{GmailInternalDateSource, GmailMessage},
+        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    },
 };
 
 /// Gmail REST message insert, wrapping the inserted `GmailMessage`.
@@ -41,12 +43,7 @@ impl GmailMessageInsert {
         {
             let mut query = url.query_pairs_mut();
 
-            if let Some(ids) = internal_date_source {
-                query.append_pair(
-                    "internalDateSource",
-                    to_variant_name(&ids).unwrap_or_default(),
-                );
-            }
+            query.extend_pairs(to_field_pairs("internalDateSource", &internal_date_source));
 
             if deleted {
                 query.append_pair("deleted", "true");
