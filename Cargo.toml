@@ -2,7 +2,7 @@
 name = "io-gmail"
 description = "Google Gmail REST API client library for Rust"
 version = "0.3.0"
-authors = ["metrovoc", "soywod <pimalaya.org@posteo.net>"]
+authors = ["metrovoc", "Clément DOUIN (soywod) <pimalaya.org@posteo.net>"]
 rust-version = "1.88"
 edition = "2024"
 license = "MIT OR Apache-2.0"
