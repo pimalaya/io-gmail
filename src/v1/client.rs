@@ -24,6 +24,7 @@ use io_http::rfc6750::bearer::HttpAuthBearer;
     feature = "native-tls"
 ))]
 use pimalaya_stream::{
+    proxy::Proxy,
     stream::{Stream, TcpConnectOptions, TlsConnectOptions},
     tls::Tls,
 };
@@ -124,6 +125,14 @@ pub struct GmailClientStdConnectOptions {
         feature = "native-tls"
     ))]
     pub tls: Tls,
+    /// How the connection reaches the API: [`Proxy::System`] resolves it
+    /// from the environment, [`Proxy::None`] connects directly.
+    #[cfg(any(
+        feature = "rustls-aws",
+        feature = "rustls-ring",
+        feature = "native-tls"
+    ))]
+    pub proxy: Proxy,
     /// Owner of the mailbox the requests target (`me` by default).
     pub user_id: String,
 }
@@ -137,6 +146,12 @@ impl Default for GmailClientStdConnectOptions {
                 feature = "native-tls"
             ))]
             tls: Tls::default(),
+            #[cfg(any(
+                feature = "rustls-aws",
+                feature = "rustls-ring",
+                feature = "native-tls"
+            ))]
+            proxy: Proxy::default(),
             user_id: String::from("me"),
         }
     }
@@ -184,7 +199,11 @@ impl GmailClientStd {
         token: impl ToString,
         options: GmailClientStdConnectOptions,
     ) -> Result<Self, GmailClientStdError> {
-        let GmailClientStdConnectOptions { tls, user_id } = options;
+        let GmailClientStdConnectOptions {
+            tls,
+            proxy,
+            user_id,
+        } = options;
 
         let url = Url::parse(GMAIL_API_BASE).expect("Gmail API base URL is valid");
         let host = url
@@ -194,13 +213,18 @@ impl GmailClientStd {
         let stream = match url.scheme() {
             "http" => {
                 let port = url.port().unwrap_or(80);
-                let opts = TcpConnectOptions::default();
+                let opts = TcpConnectOptions {
+                    proxy,
+                    ..Default::default()
+                };
+
                 Stream::connect_tcp(host, port, opts)?
             }
             "https" => {
                 let port = url.port().unwrap_or(443);
                 let opts = TlsConnectOptions {
                     tls: tls.clone(),
+                    proxy,
                     ..Default::default()
                 };
 

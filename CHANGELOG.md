@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `GmailClientStdConnectOptions::proxy`, tunnelling the connection through a SOCKS5 or HTTP proxy.
+
 ## [0.3.1] - 2026-09-28
 
 ### Fixed

@@ -27,7 +27,6 @@ use io_gmail::v1::{
         messages::{GmailMessage, GmailMessageFormat, encode_raw, list::GmailMessagesListParams},
     },
 };
-use pimalaya_stream::tls::Tls;
 
 #[test]
 #[ignore = "requires GMAIL_ACCESS_TOKEN env var and --include-ignored"]
@@ -38,8 +37,8 @@ fn gmail() {
     let user_id = env::var("GMAIL_USER_ID").unwrap_or_else(|_| "me".to_owned());
 
     let options = GmailClientStdConnectOptions {
-        tls: Tls::default(),
         user_id: user_id.clone(),
+        ..Default::default()
     };
     let mut client = GmailClientStd::connect(token.clone(), options).expect("connect");
 
