@@ -28,5 +28,5 @@ jobs:
       - name: Run the live tests
         env:
           RUST_LOG: trace
-          GMAIL_SERVICE_ACCOUNT_KEY: ${{ secrets.GMAIL_SERVICE_ACCOUNT_KEY }}
+          GMAIL_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
         run: nix develop -c cargo test --features rustls-ring --test gmail -- --ignored
