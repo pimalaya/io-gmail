@@ -38,6 +38,21 @@ impl GmailMessageGet {
         debug!("prepare gmail message retrieval");
         trace!("id: {id:?}");
 
+        let url = Self::url(user_id, id, format, metadata_headers)?;
+        let send = GmailSend::get(auth, url);
+
+        Ok(Self { send })
+    }
+
+    /// Builds the `users.messages.get` URL, shared with the batched
+    /// form of the same call
+    /// ([`GmailBatchRequest::message_get`](crate::v1::batch::GmailBatchRequest::message_get)).
+    pub fn url(
+        user_id: &str,
+        id: &str,
+        format: GmailMessageFormat,
+        metadata_headers: &[&str],
+    ) -> Result<Url, GmailSendError> {
         let mut url =
             Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/{id}"))?;
 
@@ -52,9 +67,7 @@ impl GmailMessageGet {
             }
         }
 
-        let send = GmailSend::get(auth, url);
-
-        Ok(Self { send })
+        Ok(url)
     }
 }
 

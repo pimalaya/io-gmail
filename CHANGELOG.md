@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `v1::batch::GmailBatch`, sending up to 100 `GET` calls in one `multipart/mixed` request to `https://www.googleapis.com/batch/gmail/v1` (Google advises 50 or fewer for Gmail).
+
+  Calls are `GmailBatchRequest::message_get` (`users.messages.get` with its format and metadata headers) or `GmailBatchRequest::get` on any Gmail API URL. The answer is one `GmailBatchResponse` per call, in the order of the calls whatever the order of the parts, carrying the inner status and either the parsed body or a `GmailBatchResponseError` (`Api` with the whole `GmailApiError`, `ParseResponse`, or `Missing` for a call the answer left out), so throttled calls are retried alone and 404s read as gone. `GmailBatch::with_url` targets another endpoint.
+
+- Added `GmailMessageGet::url`, the `users.messages.get` URL shared with its batched form.
+
 - Added `GmailApiError`, Google's error envelope kept whole: the status, the message, the reasons of `error.errors[]`, the canonical `error.status` and the reasons of `error.details[]`.
 
   Callers match codes instead of text through `has_reason`, `is_rate_limited` (429, `RESOURCE_EXHAUSTED`, or a 403 for `rateLimitExceeded`, `userRateLimitExceeded`, `quotaExceeded` or `RATE_LIMIT_EXCEEDED`; the daily quota is not a rate limit), `is_retryable` and `is_not_found`.

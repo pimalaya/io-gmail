@@ -1,9 +1,10 @@
 //! Gmail API v1.
 //!
 //! `rest` mirrors the REST resource tree (`users.*`); sibling modules
-//! add composed coroutines built on the REST ones (e.g. `history_poll`,
-//! a poll-based mailbox watcher).
+//! add coroutines beyond it: `batch`, several REST calls in one HTTP
+//! request, and `history_poll`, a poll-based mailbox watcher.
 
+pub mod batch;
 #[cfg(feature = "client")]
 pub mod client;
 pub mod history_poll;

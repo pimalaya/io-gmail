@@ -50,7 +50,8 @@ pub fn empty_response(status_line: &str) -> Vec<u8> {
     http_response(status_line, &[("Connection", "close")], &[])
 }
 
-fn http_response(status_line: &str, headers: &[(&str, &str)], body: &[u8]) -> Vec<u8> {
+/// Builds an HTTP response with the given headers and body.
+pub fn http_response(status_line: &str, headers: &[(&str, &str)], body: &[u8]) -> Vec<u8> {
     let mut response = Vec::new();
     response.extend_from_slice(status_line.as_bytes());
     response.extend_from_slice(b"\r\n");
@@ -65,4 +66,36 @@ fn http_response(status_line: &str, headers: &[(&str, &str)], body: &[u8]) -> Ve
     response.extend_from_slice(format!("Content-Length: {}\r\n\r\n", body.len()).as_bytes());
     response.extend_from_slice(body);
     response
+}
+
+/// Builds a keep-alive Gmail batch answer: a `multipart/mixed` body
+/// under the given boundary.
+pub fn batch_response(boundary: &str, body: &str) -> Vec<u8> {
+    let content_type = format!("multipart/mixed; boundary={boundary}");
+    http_response(
+        "HTTP/1.1 200 OK",
+        &[
+            ("Connection", "keep-alive"),
+            ("Content-Type", &content_type),
+        ],
+        body.as_bytes(),
+    )
+}
+
+/// Builds one part of a Gmail batch answer, the way Google writes it:
+/// the part headers, then the inner HTTP response with a JSON body.
+pub fn batch_part(boundary: &str, id: &str, status_line: &str, json: &str) -> String {
+    format!(
+        "--{boundary}\r\n\
+         Content-Type: application/http\r\n\
+         Content-ID: <response-{id}>\r\n\
+         \r\n\
+         {status_line}\r\n\
+         Content-Type: application/json; charset=UTF-8\r\n\
+         Vary: Origin\r\n\
+         Vary: X-Origin\r\n\
+         Vary: Referer\r\n\
+         \r\n\
+         {json}\r\n"
+    )
 }

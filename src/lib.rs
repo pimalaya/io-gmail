@@ -83,6 +83,15 @@
 //! by [`v1::query::to_query_pairs`], a tiny `no_std` serde serializer
 //! that emits the repeated-key sequences Gmail expects.
 //!
+//! ## Batching
+//!
+//! [`v1::batch::GmailBatch`] sends up to 100 `GET` calls in one
+//! `multipart/mixed` request to Google's batch endpoint, and matches
+//! each inner answer back to its call by `Content-ID`. Each call keeps
+//! its own result: a parsed body, or its own error, so a caller retries
+//! the throttled calls alone and drops the gone ones. A batch saves
+//! round trips, not quota: Google bills each inner call.
+//!
 //! ## Watching a mailbox
 //!
 //! [`v1::history_poll::GmailHistoryPoll`] is the one composite,
