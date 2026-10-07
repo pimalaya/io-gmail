@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-07
+
 ### Added
 
 - Added `v1::batch::GmailBatch`, sending up to 100 `GET` calls in one `multipart/mixed` request to `https://www.googleapis.com/batch/gmail/v1` (Google advises 50 or fewer for Gmail).
@@ -87,7 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `v1::history_poll::GmailHistoryPoll`, a poll-based mailbox watch.
 - Added `GmailClientStd`, a std blocking client behind the `client` feature.
 
-[unreleased]: https://github.com/pimalaya/io-gmail/compare/v0.3.1..HEAD
+[unreleased]: https://github.com/pimalaya/io-gmail/compare/v0.5.0..HEAD
+[0.5.0]: https://github.com/pimalaya/io-gmail/compare/v0.4.0..v0.5.0
+[0.4.0]: https://github.com/pimalaya/io-gmail/compare/v0.3.1..v0.4.0
 [0.3.1]: https://github.com/pimalaya/io-gmail/compare/v0.3.0..v0.3.1
 [0.3.0]: https://github.com/pimalaya/io-gmail/compare/v0.2.2..v0.3.0
 [0.2.2]: https://github.com/pimalaya/io-gmail/compare/v0.2.1..v0.2.2
