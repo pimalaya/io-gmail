@@ -48,10 +48,14 @@
 //! coroutine is a thin wrapper around one shared primitive,
 //! [`v1::send::GmailSend`]: it builds the authorized request (bearer
 //! token, JSON in and out) and parses either the 2xx body or Gmail's
-//! error envelope into [`v1::send::GmailSendError`]. Redirects are never
-//! followed. The terminal [`v1::send::GmailSendOutput`] carries the
-//! parsed response plus a keep-alive flag so pumps can reuse the
-//! connection across the many small requests a Gmail session makes.
+//! error envelope into [`v1::send::GmailSendError`]. The envelope is
+//! kept whole in [`v1::send::GmailApiError`] (status, `errors[].reason`,
+//! `status` and `details[].reason`), so callers match rate limits, quota
+//! answers and gone resources on Google's codes rather than on the
+//! message text. Redirects are never followed. The terminal
+//! [`v1::send::GmailSendOutput`] carries the parsed response plus a
+//! keep-alive flag so pumps can reuse the connection across the many
+//! small requests a Gmail session makes.
 //!
 //! ## Naming
 //!

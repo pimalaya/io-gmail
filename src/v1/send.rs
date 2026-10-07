@@ -65,30 +65,144 @@ pub enum GmailSendError {
     #[error("Invalid Gmail request: {0}")]
     InvalidRequest(String),
     /// Gmail returned a non-2xx status with its error envelope.
-    #[error("Gmail API returned HTTP {status}: {message}")]
-    Api {
-        /// The effective status code, from the envelope when present.
-        status: u16,
-        /// The error message, from the envelope or the raw body.
-        message: String,
-    },
+    #[error("{0}")]
+    Api(GmailApiError),
     /// The server answered with a redirect, which is never followed.
     #[error("Gmail server returned an unexpected redirect")]
     UnexpectedRedirect,
 }
 
 impl GmailSendError {
-    /// Returns the HTTP status code when the error is an API error.
-    pub fn status(&self) -> Option<u16> {
+    /// Returns the API error when Gmail answered with a non-2xx status.
+    pub fn api(&self) -> Option<&GmailApiError> {
         match self {
-            Self::Api { status, .. } => Some(*status),
+            Self::Api(err) => Some(err),
             _ => None,
         }
     }
 
-    /// Whether the error is transient (429 or 5xx) and worth retrying.
+    /// Returns the HTTP status code when the error is an API error.
+    pub fn status(&self) -> Option<u16> {
+        self.api().map(|err| err.status)
+    }
+
+    /// Whether the error is an API error worth retrying later
+    /// ([`GmailApiError::is_retryable`]).
     pub fn is_retryable(&self) -> bool {
-        matches!(self.status(), Some(429 | 500 | 502 | 503 | 504))
+        self.api().is_some_and(GmailApiError::is_retryable)
+    }
+
+    /// Whether the error is a rate limit answer
+    /// ([`GmailApiError::is_rate_limited`]).
+    pub fn is_rate_limited(&self) -> bool {
+        self.api().is_some_and(GmailApiError::is_rate_limited)
+    }
+
+    /// Whether the target of the request does not exist (404).
+    pub fn is_not_found(&self) -> bool {
+        self.status() == Some(404)
+    }
+
+    /// Whether a `users.history.list` answer says the `startHistoryId`
+    /// is too old or unknown (404): the history cursor expired, and
+    /// the caller must start over from a full listing.
+    ///
+    /// Only meaningful on a history listing, where it is the same test
+    /// as [`Self::is_not_found`].
+    pub fn is_history_expired(&self) -> bool {
+        self.is_not_found()
+    }
+}
+
+/// Gmail's error envelope, read from a non-2xx answer.
+///
+/// Google answers errors as
+/// `{"error":{"code":403,"message":"...","errors":[{"reason":"rateLimitExceeded",...}],"status":"PERMISSION_DENIED","details":[{"reason":"RATE_LIMIT_EXCEEDED",...}]}}`;
+/// the reasons and statuses are kept so callers match on codes rather
+/// than on the message text.
+#[derive(Debug, Clone, Default, Eq, PartialEq, Error)]
+#[error("Gmail API returned HTTP {status}: {message}")]
+pub struct GmailApiError {
+    /// The effective status code: `error.code` when present, the HTTP
+    /// status otherwise.
+    pub status: u16,
+    /// The error message, from the envelope or the raw body.
+    pub message: String,
+    /// The reasons of `error.errors[]`, in order, such as `notFound`,
+    /// `rateLimitExceeded`, `userRateLimitExceeded`, `quotaExceeded` or
+    /// `dailyLimitExceeded`.
+    pub reasons: Vec<String>,
+    /// The canonical status of `error.status`, such as `NOT_FOUND`,
+    /// `PERMISSION_DENIED` or `RESOURCE_EXHAUSTED`.
+    pub google_status: Option<String>,
+    /// The reasons of `error.details[]` (`google.rpc.ErrorInfo`), such
+    /// as `RATE_LIMIT_EXCEEDED`.
+    pub detail_reasons: Vec<String>,
+}
+
+impl GmailApiError {
+    /// Reads Gmail's error envelope out of a non-2xx answer, falling
+    /// back to the raw body as message.
+    pub fn parse(http_status: u16, body: &[u8]) -> Self {
+        let (status, message) = parse_api_error(http_status, body);
+        let mut err = Self {
+            status,
+            message,
+            ..Default::default()
+        };
+
+        if let Ok(envelope) = serde_json::from_slice::<ErrorEnvelope>(body) {
+            let error = envelope.error;
+            err.reasons = error.errors.into_iter().filter_map(|e| e.reason).collect();
+            err.google_status = error.status;
+            err.detail_reasons = error.details.into_iter().filter_map(|d| d.reason).collect();
+        }
+
+        err
+    }
+
+    /// Whether `reason` is one of [`Self::reasons`] or
+    /// [`Self::detail_reasons`].
+    pub fn has_reason(&self, reason: &str) -> bool {
+        self.reasons
+            .iter()
+            .chain(&self.detail_reasons)
+            .any(|r| r == reason)
+    }
+
+    /// Whether Google throttled the request: a 429, a
+    /// `RESOURCE_EXHAUSTED` status, or a 403 whose reason is
+    /// `rateLimitExceeded`, `userRateLimitExceeded`, `quotaExceeded`
+    /// (per-minute quotas such as "Units per minute per user") or
+    /// `RATE_LIMIT_EXCEEDED`.
+    ///
+    /// The daily quota (`dailyLimitExceeded`) is not a rate limit:
+    /// waiting a minute does not lift it.
+    pub fn is_rate_limited(&self) -> bool {
+        if self.status == 429 || self.google_status.as_deref() == Some("RESOURCE_EXHAUSTED") {
+            return true;
+        }
+
+        self.status == 403
+            && [
+                "rateLimitExceeded",
+                "userRateLimitExceeded",
+                "quotaExceeded",
+                "RATE_LIMIT_EXCEEDED",
+            ]
+            .iter()
+            .any(|reason| self.has_reason(reason))
+    }
+
+    /// Whether the request is worth sending again later: rate limited
+    /// ([`Self::is_rate_limited`]) or a transient 5xx.
+    pub fn is_retryable(&self) -> bool {
+        self.is_rate_limited() || matches!(self.status, 500 | 502 | 503 | 504)
+    }
+
+    /// Whether the target of the request does not exist (404).
+    pub fn is_not_found(&self) -> bool {
+        self.status == 404
     }
 }
 
@@ -248,8 +362,8 @@ impl<T: DeserializeOwned> GmailCoroutine for GmailSend<T> {
                             )),
                         }
                     } else {
-                        let (status, message) = parse_api_error(*response.status, &response.body);
-                        GmailCoroutineState::Complete(Err(GmailSendError::Api { status, message }))
+                        let err = GmailApiError::parse(*response.status, &response.body);
+                        GmailCoroutineState::Complete(Err(GmailSendError::Api(err)))
                     }
                 }
             },
@@ -270,6 +384,18 @@ struct ErrorEnvelope {
 struct ErrorBody {
     code: Option<u16>,
     message: Option<String>,
+    #[serde(default)]
+    errors: Vec<ErrorReason>,
+    status: Option<String>,
+    #[serde(default)]
+    details: Vec<ErrorReason>,
+}
+
+/// An item of `error.errors[]` or `error.details[]`, of which only the
+/// reason is kept.
+#[derive(Debug, Deserialize)]
+struct ErrorReason {
+    reason: Option<String>,
 }
 
 /// Parses Gmail's JSON error envelope, falling back to the raw body;

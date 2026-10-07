@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `GmailApiError`, Google's error envelope kept whole: the status, the message, the reasons of `error.errors[]`, the canonical `error.status` and the reasons of `error.details[]`.
+
+  Callers match codes instead of text through `has_reason`, `is_rate_limited` (429, `RESOURCE_EXHAUSTED`, or a 403 for `rateLimitExceeded`, `userRateLimitExceeded`, `quotaExceeded` or `RATE_LIMIT_EXCEEDED`; the daily quota is not a rate limit), `is_retryable` and `is_not_found`.
+
+- Added `GmailSendError::api`, `is_rate_limited`, `is_not_found` and `is_history_expired`, the last one telling a `users.history.list` 404 (the `startHistoryId` is too old or unknown).
+
+### Changed
+
+- Changed `GmailSendError::Api` to carry a `GmailApiError`. **Breaking change.**
+
+  `GmailSendError::Api { status, message }` becomes `GmailSendError::Api(err)`, with `err.status` and `err.message`.
+
+- Changed `GmailSendError::is_retryable` to also hold for a 403 rate limit, beside 429 and 5xx. **Behaviour change.**
+
 ## [0.4.0] - 2026-09-29
 
 ### Added

@@ -145,9 +145,9 @@ fn surfaces_api_errors() {
     let (ret, _) = run(&mut coroutine, &response);
 
     match ret.unwrap_err() {
-        GmailSendError::Api { status, message } => {
-            assert_eq!(status, 403);
-            assert_eq!(message, "insufficient permissions");
+        GmailSendError::Api(err) => {
+            assert_eq!(err.status, 403);
+            assert_eq!(err.message, "insufficient permissions");
         }
         err => panic!("unexpected error: {err}"),
     }
@@ -222,6 +222,122 @@ fn serializes_params_into_query_pairs() {
             ("maxResults".to_string(), "10".to_string()),
         ],
     );
+}
+
+fn api_error(response: &[u8]) -> GmailSendError {
+    let mut coroutine = GmailLabelsList::new(&auth(), "me").unwrap();
+    let (ret, _) = run(&mut coroutine, response);
+    ret.unwrap_err()
+}
+
+#[test]
+fn keeps_google_error_codes() {
+    let response = json_response(
+        "HTTP/1.1 403 Forbidden",
+        r#"{
+  "error": {
+    "code": 403,
+    "message": "Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user' of service 'gmail.googleapis.com' for consumer 'project_number:123456789'.",
+    "errors": [
+      {
+        "message": "Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user' of service 'gmail.googleapis.com' for consumer 'project_number:123456789'.",
+        "domain": "usageLimits",
+        "reason": "rateLimitExceeded"
+      }
+    ],
+    "status": "PERMISSION_DENIED",
+    "details": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "reason": "RATE_LIMIT_EXCEEDED",
+        "domain": "googleapis.com",
+        "metadata": {
+          "quota_limit": "UnitsPerMinutePerUser",
+          "service": "gmail.googleapis.com",
+          "consumer": "projects/123456789"
+        }
+      }
+    ]
+  }
+}"#,
+    );
+    let err = api_error(&response);
+    let api = err.api().unwrap();
+
+    assert_eq!(api.status, 403);
+    assert_eq!(api.reasons, ["rateLimitExceeded"]);
+    assert_eq!(api.google_status.as_deref(), Some("PERMISSION_DENIED"));
+    assert_eq!(api.detail_reasons, ["RATE_LIMIT_EXCEEDED"]);
+    assert!(err.is_rate_limited());
+    assert!(err.is_retryable());
+    assert!(!err.is_not_found());
+}
+
+#[test]
+fn tells_rate_limits_from_daily_quota() {
+    let error = |status_line: &str, code: u16, reason: &str, status: &str| {
+        api_error(&json_response(
+            status_line,
+            &format!(
+                r#"{{"error":{{"code":{code},"message":"limited","errors":[{{"domain":"usageLimits","reason":"{reason}","message":"limited"}}],"status":"{status}"}}}}"#
+            ),
+        ))
+    };
+
+    let user = error(
+        "HTTP/1.1 403 Forbidden",
+        403,
+        "userRateLimitExceeded",
+        "PERMISSION_DENIED",
+    );
+    assert!(user.is_rate_limited());
+
+    let quota = error(
+        "HTTP/1.1 403 Forbidden",
+        403,
+        "quotaExceeded",
+        "PERMISSION_DENIED",
+    );
+    assert!(quota.is_rate_limited());
+
+    let concurrent = error(
+        "HTTP/1.1 429 Too Many Requests",
+        429,
+        "rateLimitExceeded",
+        "RESOURCE_EXHAUSTED",
+    );
+    assert!(concurrent.is_rate_limited());
+
+    let daily = error(
+        "HTTP/1.1 403 Forbidden",
+        403,
+        "dailyLimitExceeded",
+        "PERMISSION_DENIED",
+    );
+    assert!(daily.api().unwrap().has_reason("dailyLimitExceeded"));
+    assert!(!daily.is_rate_limited());
+    assert!(!daily.is_retryable());
+
+    let denied = error(
+        "HTTP/1.1 403 Forbidden",
+        403,
+        "insufficientPermissions",
+        "PERMISSION_DENIED",
+    );
+    assert!(!denied.is_rate_limited());
+
+    let details_only = api_error(&json_response(
+        "HTTP/1.1 403 Forbidden",
+        r#"{"error":{"code":403,"message":"limited","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"RATE_LIMIT_EXCEEDED"}]}}"#,
+    ));
+    assert!(details_only.is_rate_limited());
+
+    let unavailable = api_error(&json_response(
+        "HTTP/1.1 503 Service Unavailable",
+        r#"{"error":{"code":503,"message":"The service is currently unavailable.","status":"UNAVAILABLE"}}"#,
+    ));
+    assert!(!unavailable.is_rate_limited());
+    assert!(unavailable.is_retryable());
 }
 
 #[test]
@@ -338,4 +454,27 @@ fn lists_account_history() {
     let deleted = &out.history[3].messages_deleted[0].message;
     assert_eq!(deleted.id, "m4");
     assert!(deleted.label_ids.is_empty());
+}
+
+#[test]
+fn tells_expired_history_cursor() {
+    let response = json_response(
+        "HTTP/1.1 404 Not Found",
+        r#"{"error":{"code":404,"message":"Requested entity was not found.","errors":[{"message":"Requested entity was not found.","domain":"global","reason":"notFound"}],"status":"NOT_FOUND"}}"#,
+    );
+    let params = GmailHistoryListParams {
+        start_history_id: "1",
+        ..Default::default()
+    };
+    let mut coroutine = GmailHistoryList::new(&auth(), "me", &params).unwrap();
+    let (ret, _) = run(&mut coroutine, &response);
+    let err = ret.unwrap_err();
+
+    assert!(err.is_history_expired());
+    assert!(err.is_not_found());
+    assert!(!err.is_retryable());
+    assert_eq!(
+        err.api().unwrap().google_status.as_deref(),
+        Some("NOT_FOUND")
+    );
 }

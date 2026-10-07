@@ -198,7 +198,7 @@ impl GmailCoroutine for GmailHistoryPoll {
                         ));
                     }
                     GmailCoroutineState::Complete(Err(err)) => {
-                        if err.status() == Some(404) {
+                        if err.is_history_expired() {
                             debug!("history cursor expired, re-baselining");
                             let profile = match GmailProfileGet::new(&self.auth, &self.user_id) {
                                 Ok(profile) => profile,
