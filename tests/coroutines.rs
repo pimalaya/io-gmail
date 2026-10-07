@@ -7,11 +7,18 @@ mod common;
 use io_gmail::v1::{
     query::{is_false, to_query_pairs},
     rest::{
+        history::{
+            GmailHistoryType,
+            list::{GmailHistoryList, GmailHistoryListParams},
+        },
         labels::{
             GmailLabel, GmailLabelListVisibility, create::GmailLabelCreate,
             delete::GmailLabelDelete, list::GmailLabelsList, patch::GmailLabelPatch,
         },
-        messages::{GmailMessageListVisibility, decode_raw, encode_raw},
+        messages::{
+            GmailMessageListVisibility, decode_raw, encode_raw,
+            list::{GmailMessagesList, GmailMessagesListParams},
+        },
         users::get_profile::GmailProfileGet,
     },
     send::{GmailSendError, parse_api_error},
@@ -215,4 +222,120 @@ fn serializes_params_into_query_pairs() {
             ("maxResults".to_string(), "10".to_string()),
         ],
     );
+}
+
+#[test]
+fn lists_account_messages() {
+    let response = json_response(
+        "HTTP/1.1 200 OK",
+        r#"{"messages":[{"id":"18c2f0a1","threadId":"18c2f0a0"},{"id":"18c2f09f","threadId":"18c2f09f"}],"nextPageToken":"page-2","resultSizeEstimate":1000}"#,
+    );
+    let params = GmailMessagesListParams {
+        max_results: Some(500),
+        page_token: Some("page-1"),
+        include_spam_trash: true,
+        ..Default::default()
+    };
+    let mut coroutine = GmailMessagesList::new(&auth(), "me", &params).unwrap();
+    let (ret, written) = run(&mut coroutine, &response);
+    let out = ret.unwrap().response;
+
+    let request = String::from_utf8_lossy(&written);
+    assert!(
+        request.starts_with(
+            "GET /gmail/v1/users/me/messages?maxResults=500&pageToken=page-1&includeSpamTrash=true HTTP/1.1\r\n"
+        ),
+        "got: {request}"
+    );
+
+    assert_eq!(out.messages.len(), 2);
+    assert_eq!(out.messages[0].id, "18c2f0a1");
+    assert_eq!(out.messages[0].thread_id.as_deref(), Some("18c2f0a0"));
+    assert_eq!(out.next_page_token.as_deref(), Some("page-2"));
+}
+
+#[test]
+fn lists_account_history() {
+    let response = json_response(
+        "HTTP/1.1 200 OK",
+        r#"{
+  "history": [
+    {
+      "id": "1235",
+      "messages": [{ "id": "m1", "threadId": "t1" }],
+      "messagesAdded": [
+        { "message": { "id": "m1", "threadId": "t1", "labelIds": ["INBOX", "UNREAD", "CATEGORY_UPDATES"] } }
+      ]
+    },
+    {
+      "id": "1236",
+      "messages": [{ "id": "m2", "threadId": "t2" }],
+      "labelsRemoved": [
+        { "message": { "id": "m2", "threadId": "t2", "labelIds": ["IMPORTANT"] }, "labelIds": ["INBOX"] }
+      ]
+    },
+    {
+      "id": "1237",
+      "messages": [{ "id": "m3", "threadId": "t3" }],
+      "labelsAdded": [
+        { "message": { "id": "m3", "threadId": "t3", "labelIds": ["INBOX", "STARRED"] }, "labelIds": ["STARRED"] }
+      ]
+    },
+    {
+      "id": "1238",
+      "messages": [{ "id": "m4", "threadId": "t4" }],
+      "messagesDeleted": [
+        { "message": { "id": "m4", "threadId": "t4" } }
+      ]
+    }
+  ],
+  "nextPageToken": "history-2",
+  "historyId": "1240"
+}"#,
+    );
+    let types = [
+        GmailHistoryType::MessageAdded,
+        GmailHistoryType::MessageDeleted,
+        GmailHistoryType::LabelAdded,
+        GmailHistoryType::LabelRemoved,
+    ];
+    let params = GmailHistoryListParams {
+        start_history_id: "1234",
+        history_types: &types,
+        max_results: Some(500),
+        ..Default::default()
+    };
+    let mut coroutine = GmailHistoryList::new(&auth(), "me", &params).unwrap();
+    let (ret, written) = run(&mut coroutine, &response);
+    let out = ret.unwrap().response;
+
+    let request = String::from_utf8_lossy(&written);
+    assert!(
+        request.starts_with(
+            "GET /gmail/v1/users/me/history?startHistoryId=1234&historyTypes=messageAdded&historyTypes=messageDeleted&historyTypes=labelAdded&historyTypes=labelRemoved&maxResults=500 HTTP/1.1\r\n"
+        ),
+        "got: {request}"
+    );
+
+    assert_eq!(out.history.len(), 4);
+    assert_eq!(out.history_id.as_deref(), Some("1240"));
+    assert_eq!(out.next_page_token.as_deref(), Some("history-2"));
+
+    let added = &out.history[0].messages_added[0].message;
+    assert_eq!(added.id, "m1");
+    assert_eq!(added.label_ids, ["INBOX", "UNREAD", "CATEGORY_UPDATES"]);
+
+    let removed = &out.history[1].labels_removed[0];
+    assert_eq!(removed.message.id, "m2");
+    assert_eq!(removed.message.label_ids, ["IMPORTANT"]);
+    assert_eq!(removed.label_ids, ["INBOX"]);
+
+    let labelled = &out.history[2].labels_added[0];
+    assert_eq!(labelled.message.id, "m3");
+    assert_eq!(labelled.message.label_ids, ["INBOX", "STARRED"]);
+    assert_eq!(labelled.label_ids, ["STARRED"]);
+
+    let deleted = &out.history[3].messages_deleted[0].message;
+    assert_eq!(deleted.id, "m4");
+    assert!(deleted.label_ids.is_empty());
 }
