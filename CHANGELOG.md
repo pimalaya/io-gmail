@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-04
+
 ### Added
 
 - Added `GmailRawDecodeError`, returned by `decode_raw` for input outside base64url.
@@ -107,7 +109,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `v1::history_poll::GmailHistoryPoll`, a poll-based mailbox watch.
 - Added `GmailClientStd`, a std blocking client behind the `client` feature.
 
-[unreleased]: https://github.com/pimalaya/io-gmail/compare/v0.5.0..HEAD
+[unreleased]: https://github.com/pimalaya/io-gmail/compare/v0.6.0..HEAD
+[0.6.0]: https://github.com/pimalaya/io-gmail/compare/v0.5.0..v0.6.0
 [0.5.0]: https://github.com/pimalaya/io-gmail/compare/v0.4.0..v0.5.0
 [0.4.0]: https://github.com/pimalaya/io-gmail/compare/v0.3.1..v0.4.0
 [0.3.1]: https://github.com/pimalaya/io-gmail/compare/v0.3.0..v0.3.1
