@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped io-http to 0.6. **Breaking change.**
+
+  The coroutines take its `HttpAuthBearer`, so consumers bump it in step.
+
+- Raised the minimum supported Rust version from 1.88 to 1.89.
+
 ## [0.5.0] - 2026-10-07
 
 ### Added
