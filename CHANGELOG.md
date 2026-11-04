@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `GmailRawDecodeError`, returned by `decode_raw` for input outside base64url.
+
 ### Changed
+
+- Replaced the base64 crate with [base64-codec](https://crates.io/crates/base64-codec) for `decode_raw` and `encode_raw`.
+
+  It runs on the CPU token the application installs with `simd_cpu::SimdCpu::install_detected`, the portable baseline when none is.
+
+- Changed `decode_raw` to fail with `GmailRawDecodeError` instead of `base64::DecodeError`. **Breaking change.**
 
 - Bumped io-http to 0.6. **Breaking change.**
 

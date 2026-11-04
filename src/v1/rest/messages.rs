@@ -5,8 +5,9 @@
 
 use alloc::{string::String, vec::Vec};
 
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64_codec::codec::{Base64Alphabet, Base64Codec};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 pub mod attachments;
 pub mod batch_delete;
@@ -59,21 +60,45 @@ pub struct GmailMessage {
     pub history_id: Option<String>,
 }
 
+/// The error returned by [`decode_raw`] when the input is not base64url.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Error)]
+#[error("Gmail raw string is not base64url")]
+pub struct GmailRawDecodeError;
+
 /// Decodes a base64url-encoded (URL-safe, no padding) raw string back
 /// into RFC 5322 message bytes.
 ///
-/// Whitespace and trailing padding are stripped beforehand, so both
-/// padded and unpadded inputs decode.
-pub fn decode_raw(raw: &str) -> Result<Vec<u8>, base64::DecodeError> {
-    let normalized: String = raw.chars().filter(|c| !c.is_ascii_whitespace()).collect();
-    let normalized = normalized.trim_end_matches('=');
-    URL_SAFE_NO_PAD.decode(normalized)
+/// Line breaks and blanks are skipped and padding is optional, so both
+/// padded and unpadded inputs decode. Any other byte outside the alphabet
+/// fails.
+pub fn decode_raw(raw: &str) -> Result<Vec<u8>, GmailRawDecodeError> {
+    let mut decoded = Vec::new();
+
+    if !codec().decode_vec(raw.as_bytes(), &mut decoded) {
+        return Err(GmailRawDecodeError);
+    }
+
+    Ok(decoded)
 }
 
 /// Encodes raw RFC 5322 message bytes into the base64url (URL-safe,
 /// no padding) string expected by the `raw` field.
 pub fn encode_raw(raw: &[u8]) -> String {
-    URL_SAFE_NO_PAD.encode(raw)
+    let mut encoded = Vec::new();
+    codec().encode_vec(raw, &mut encoded);
+
+    // NOTE: the base64 alphabet is ASCII, so this never falls back.
+    String::from_utf8(encoded).unwrap_or_default()
+}
+
+/// The unpadded base64url codec of the `raw` field, on the CPU token the
+/// application installed.
+fn codec() -> Base64Codec {
+    Base64Codec {
+        alphabet: Base64Alphabet::Url,
+        pad: false,
+        ..Base64Codec::default()
+    }
 }
 
 /// A lightweight Gmail message resource carrying only its ids.

@@ -188,6 +188,13 @@ fn decodes_padded_and_wrapped_raw_messages() {
 }
 
 #[test]
+fn refuses_raw_messages_outside_base64url() {
+    // NOTE: `+` and `/` belong to the standard alphabet, not base64url.
+    assert!(decode_raw("Pz8+Pz8/").is_err());
+    assert!(decode_raw("SGVs!bG8").is_err());
+}
+
+#[test]
 fn serializes_params_into_query_pairs() {
     #[derive(serde::Serialize)]
     #[serde(rename_all = "camelCase")]
