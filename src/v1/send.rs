@@ -5,7 +5,7 @@
 //!
 //! Gmail API reference: <https://developers.google.com/gmail/api/reference/rest>.
 
-use core::marker::PhantomData;
+use core::{marker::PhantomData, time::Duration};
 
 use alloc::{
     format,
@@ -24,10 +24,11 @@ use io_http::{
 };
 use log::{debug, trace};
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
+use serde_json::Value;
 use thiserror::Error;
 use url::Url;
 
-use crate::coroutine::*;
+use crate::{coroutine::*, v1::query::GmailQueryError};
 
 /// Base URL of the Gmail REST API v1.
 pub const GMAIL_API_BASE: &str = "https://gmail.googleapis.com/gmail/v1/";
@@ -111,6 +112,12 @@ impl GmailSendError {
         self.api().map(|err| err.status)
     }
 
+    /// Returns how long the server asked to wait before a retry
+    /// ([`GmailApiError::retry_after`]).
+    pub fn retry_after(&self) -> Option<Duration> {
+        self.api().and_then(|err| err.retry_after)
+    }
+
     /// Whether the error is an API error worth retrying later
     /// ([`GmailApiError::is_retryable`]).
     pub fn is_retryable(&self) -> bool {
@@ -139,6 +146,12 @@ impl GmailSendError {
     }
 }
 
+impl From<GmailQueryError> for GmailSendError {
+    fn from(err: GmailQueryError) -> Self {
+        Self::InvalidRequest(err.to_string())
+    }
+}
+
 /// Gmail's error envelope, read from a non-2xx answer.
 ///
 /// Google answers errors as
@@ -151,7 +164,8 @@ pub struct GmailApiError {
     /// The effective status code: `error.code` when present, the HTTP
     /// status otherwise.
     pub status: u16,
-    /// The error message, from the envelope or the raw body.
+    /// The error message, from the envelope or a summary of the raw
+    /// body.
     pub message: String,
     /// The reasons of `error.errors[]`, in order, such as `notFound`,
     /// `rateLimitExceeded`, `userRateLimitExceeded`, `quotaExceeded` or
@@ -163,11 +177,18 @@ pub struct GmailApiError {
     /// The reasons of `error.details[]` (`google.rpc.ErrorInfo`), such
     /// as `RATE_LIMIT_EXCEEDED`.
     pub detail_reasons: Vec<String>,
+    /// How long the server asked to wait before a retry: the
+    /// `Retry-After` header in its seconds form, else the delay of
+    /// `error.details[]` (`google.rpc.RetryInfo`).
+    pub retry_after: Option<Duration>,
 }
 
 impl GmailApiError {
-    /// Reads Gmail's error envelope out of a non-2xx answer, falling
-    /// back to the raw body as message.
+    /// Reads Gmail's error envelope out of a non-2xx body, falling back
+    /// to a summary of the raw body as message.
+    ///
+    /// The body does not tell the `Retry-After` header: the exchange
+    /// fills it in.
     pub fn parse(http_status: u16, body: &[u8]) -> Self {
         let (status, message) = parse_api_error(http_status, body);
         let mut err = Self {
@@ -180,6 +201,10 @@ impl GmailApiError {
             let error = envelope.error;
             err.reasons = error.errors.into_iter().filter_map(|e| e.reason).collect();
             err.google_status = error.status;
+            err.retry_after = error
+                .details
+                .iter()
+                .find_map(|d| d.retry_delay.as_ref()?.as_str().and_then(parse_delay));
             err.detail_reasons = error.details.into_iter().filter_map(|d| d.reason).collect();
         }
 
@@ -345,9 +370,13 @@ impl<T: DeserializeOwned> GmailCoroutine for GmailSend<T> {
                 }
                 HttpCoroutineState::Complete(Ok(HttpSendOutput {
                     response,
+                    remaining,
                     keep_alive,
-                    ..
                 })) => {
+                    // NOTE: the receive buffer keeps the capacity of the
+                    // whole response, free it before parsing the body.
+                    drop(remaining);
+
                     if response.status.is_success() {
                         // NOTE: an empty 2xx body — a DELETE, or a list
                         // endpoint with an empty collection (e.g.
@@ -372,7 +401,11 @@ impl<T: DeserializeOwned> GmailCoroutine for GmailSend<T> {
                             )),
                         }
                     } else {
-                        let err = GmailApiError::parse(*response.status, &response.body);
+                        let mut err = GmailApiError::parse(*response.status, &response.body);
+                        let delay = response.header("retry-after").and_then(parse_delay);
+
+                        err.retry_after = delay.or(err.retry_after);
+
                         GmailCoroutineState::Complete(Err(GmailSendError::Api(err)))
                     }
                 }
@@ -395,21 +428,24 @@ struct ErrorBody {
     code: Option<u16>,
     message: Option<String>,
     #[serde(default)]
-    errors: Vec<ErrorReason>,
+    errors: Vec<ErrorItem>,
     status: Option<String>,
     #[serde(default)]
-    details: Vec<ErrorReason>,
+    details: Vec<ErrorItem>,
 }
 
 /// An item of `error.errors[]` or `error.details[]`, of which only the
-/// reason is kept.
+/// reason and the retry delay are kept.
 #[derive(Debug, Deserialize)]
-struct ErrorReason {
+#[serde(rename_all = "camelCase")]
+struct ErrorItem {
     reason: Option<String>,
+    // NOTE: read loosely, so an unexpected shape cannot fail the envelope.
+    retry_delay: Option<Value>,
 }
 
-/// Parses Gmail's JSON error envelope, falling back to the raw body;
-/// returns the effective status code and message.
+/// Parses Gmail's JSON error envelope, falling back to a summary of the
+/// raw body; returns the effective status code and message.
 pub fn parse_api_error(http_status: u16, body: &[u8]) -> (u16, String) {
     if let Ok(envelope) = serde_json::from_slice::<ErrorEnvelope>(body) {
         let status = envelope.error.code.unwrap_or(http_status);
@@ -421,13 +457,84 @@ pub fn parse_api_error(http_status: u16, body: &[u8]) -> (u16, String) {
         return (status, message);
     }
 
-    let message = String::from_utf8_lossy(body).trim().to_string();
+    let message = summarize_body(body);
 
     if message.is_empty() {
         (http_status, String::from("unknown Gmail API error"))
     } else {
         (http_status, message)
     }
+}
+
+/// Maximum length of a summarised error body, in characters.
+const SUMMARY_LEN: usize = 200;
+
+/// Number of leading bytes of an error body a summary is made from.
+const SUMMARY_SCAN_LEN: usize = 4096;
+
+/// Boils a body that is not an error envelope down to one readable
+/// line: the `title` of an HTML page, else its text without markup,
+/// whitespace collapsed, capped at [`SUMMARY_LEN`] characters.
+fn summarize_body(body: &[u8]) -> String {
+    let body = String::from_utf8_lossy(&body[..body.len().min(SUMMARY_SCAN_LEN)]);
+    let text = element_text(&body, "title").unwrap_or_else(|| strip_markup(&body));
+    let text = text.trim();
+
+    match text.char_indices().nth(SUMMARY_LEN) {
+        Some((end, _)) => format!("{}…", &text[..end]),
+        None => text.to_string(),
+    }
+}
+
+/// The trimmed text of the first `<local>` element, when it has any.
+fn element_text(body: &str, local: &str) -> Option<String> {
+    let open = format!("<{local}>");
+    let start = body.find(&open)? + open.len();
+    let rest = &body[start..];
+    let end = rest.find("</")?;
+    let text = rest[..end].trim();
+
+    (!text.is_empty()).then(|| text.to_string())
+}
+
+/// Drops every `<...>` tag and collapses the remaining whitespace.
+fn strip_markup(body: &str) -> String {
+    let mut out = String::with_capacity(body.len());
+    let mut in_tag = false;
+
+    for ch in body.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if in_tag => continue,
+            ch if ch.is_whitespace() => {
+                if !out.ends_with(' ') {
+                    out.push(' ');
+                }
+            }
+            ch => out.push(ch),
+        }
+    }
+
+    out
+}
+
+/// Reads a delay in seconds: the `Retry-After` header (`120`) or the
+/// `retryDelay` of the envelope (`1.5s`). A date reads as none.
+pub(crate) fn parse_delay(value: &str) -> Option<Duration> {
+    let value = value.trim();
+    let value = value.strip_suffix('s').unwrap_or(value);
+    let (secs, frac) = value.split_once('.').unwrap_or((value, ""));
+
+    if secs.is_empty() || !secs.chars().chain(frac.chars()).all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+
+    let secs = secs.parse().ok()?;
+    let nanos = frac.bytes().chain([b'0'; 9]).take(9);
+    let nanos = nanos.fold(0, |nanos, digit| nanos * 10 + u32::from(digit - b'0'));
+
+    Some(Duration::new(secs, nanos))
 }
 
 /// The `Authorization` header value of `auth`, refused when the token

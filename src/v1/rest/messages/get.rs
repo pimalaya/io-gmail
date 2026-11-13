@@ -55,7 +55,7 @@ impl GmailMessageGet {
 
         {
             let mut query = url.query_pairs_mut();
-            query.extend_pairs(to_field_pairs("format", &format));
+            query.extend_pairs(to_field_pairs("format", &format)?);
 
             if matches!(format, GmailMessageFormat::Metadata) {
                 for header in metadata_headers {

@@ -85,7 +85,7 @@
 //! }
 //! ```
 
-use core::{iter, marker::PhantomData};
+use core::{iter, marker::PhantomData, time::Duration};
 
 use alloc::{
     format,
@@ -111,7 +111,7 @@ use crate::{
     coroutine::*,
     v1::{
         rest::messages::{GmailMessageFormat, get::GmailMessageGet},
-        send::{GmailApiError, GmailSendError, GmailSendOutput, gmail_authorization},
+        send::{GmailApiError, GmailSendError, GmailSendOutput, gmail_authorization, parse_delay},
     },
 };
 
@@ -211,6 +211,12 @@ impl GmailBatchResponseError {
     /// Returns the HTTP status code when the error is an API error.
     pub fn status(&self) -> Option<u16> {
         self.api().map(|err| err.status)
+    }
+
+    /// Returns how long the server asked to wait before a retry
+    /// ([`GmailApiError::retry_after`]).
+    pub fn retry_after(&self) -> Option<Duration> {
+        self.api().and_then(|err| err.retry_after)
     }
 
     /// Whether Google throttled the call
@@ -328,7 +334,11 @@ impl<T: DeserializeOwned> GmailCoroutine for GmailBatch<T> {
         };
 
         if !response.status.is_success() {
-            let err = GmailApiError::parse(*response.status, &response.body);
+            let mut err = GmailApiError::parse(*response.status, &response.body);
+            let delay = response.header("retry-after").and_then(parse_delay);
+
+            err.retry_after = delay.or(err.retry_after);
+
             return GmailCoroutineState::Complete(Err(GmailSendError::Api(err)));
         }
 
@@ -353,6 +363,13 @@ impl<T: DeserializeOwned> GmailCoroutine for GmailBatch<T> {
             keep_alive,
         }))
     }
+}
+
+/// The inner HTTP response of an answered part.
+struct InnerResponse<'a> {
+    status: u16,
+    retry_after: Option<Duration>,
+    body: &'a [u8],
 }
 
 /// Refuses an empty or oversized batch, duplicate ids, and ids or paths
@@ -432,7 +449,7 @@ fn parse_responses<T: DeserializeOwned>(
     body: &[u8],
     boundary: &str,
 ) -> Vec<GmailBatchResponse<T>> {
-    let mut answers: Vec<Option<(u16, &[u8])>> = ids.iter().map(|_| None).collect();
+    let mut answers: Vec<Option<InnerResponse>> = ids.iter().map(|_| None).collect();
     let mut unanswered = ids.len();
 
     let delimiter = format!("--{boundary}");
@@ -480,13 +497,19 @@ fn parse_responses<T: DeserializeOwned>(
     ids.iter()
         .zip(answers)
         .map(|(id, answer)| {
-            let Some((status, body)) = answer else {
+            let Some(answer) = answer else {
                 return GmailBatchResponse {
                     id: id.clone(),
                     status: None,
                     result: Err(GmailBatchResponseError::Missing),
                 };
             };
+
+            let InnerResponse {
+                status,
+                retry_after,
+                body,
+            } = answer;
 
             let result = if (200..300).contains(&status) {
                 // NOTE: same normalisation as `GmailSend`: an empty 2xx
@@ -499,9 +522,9 @@ fn parse_responses<T: DeserializeOwned>(
 
                 serde_json::from_slice(body).map_err(GmailBatchResponseError::ParseResponse)
             } else {
-                Err(GmailBatchResponseError::Api(GmailApiError::parse(
-                    status, body,
-                )))
+                let mut err = GmailApiError::parse(status, body);
+                err.retry_after = retry_after.or(err.retry_after);
+                Err(GmailBatchResponseError::Api(err))
             };
 
             GmailBatchResponse {
@@ -513,8 +536,9 @@ fn parse_responses<T: DeserializeOwned>(
         .collect()
 }
 
-/// Reads the status code and body of an inner HTTP response.
-fn parse_inner_response(bytes: &[u8]) -> Option<(u16, &[u8])> {
+/// Reads the status code, the `Retry-After` delay and the body of an
+/// inner HTTP response.
+fn parse_inner_response(bytes: &[u8]) -> Option<InnerResponse<'_>> {
     let start = bytes.iter().position(|b| !b.is_ascii_whitespace())?;
     let (head, body) = split_head(&bytes[start..]);
 
@@ -526,7 +550,13 @@ fn parse_inner_response(bytes: &[u8]) -> Option<(u16, &[u8])> {
     }
 
     let status = tokens.next()?.parse().ok()?;
-    Some((status, body))
+    let retry_after = header(head, "retry-after").and_then(parse_delay);
+
+    Some(InnerResponse {
+        status,
+        retry_after,
+        body,
+    })
 }
 
 /// Iterates the contents of the parts of a multipart body, one

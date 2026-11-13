@@ -4,20 +4,30 @@
 
 mod common;
 
+use std::time::Duration;
+
 use io_gmail::v1::{
-    query::{is_false, to_query_pairs},
+    query::{is_false, to_field_pairs, to_query_pairs},
     rest::{
         history::{
             GmailHistoryType,
             list::{GmailHistoryList, GmailHistoryListParams},
         },
         labels::{
-            GmailLabel, GmailLabelListVisibility, create::GmailLabelCreate,
+            GmailLabel, GmailLabelListVisibility, GmailLabelType, create::GmailLabelCreate,
             delete::GmailLabelDelete, list::GmailLabelsList, patch::GmailLabelPatch,
+            update::GmailLabelUpdate,
         },
         messages::{
             GmailMessageListVisibility, decode_raw, encode_raw,
             list::{GmailMessagesList, GmailMessagesListParams},
+        },
+        settings::{
+            GmailAutoForwarding, GmailDisposition, GmailExpungeBehavior, GmailImapSettings,
+            GmailPopAccessWindow, GmailPopSettings, GmailVerificationStatus,
+            filters::{GmailFilter, GmailFilterSizeComparison},
+            forwarding_addresses::GmailForwardingAddress,
+            send_as::{GmailSecurityMode, GmailSendAs},
         },
         users::get_profile::GmailProfileGet,
     },
@@ -25,7 +35,7 @@ use io_gmail::v1::{
 };
 use io_http::rfc6750::bearer::HttpAuthBearer;
 
-use common::{empty_response, json_response, run};
+use common::{empty_response, http_response, json_response, run};
 
 fn auth() -> HttpAuthBearer {
     HttpAuthBearer::new("fake-token")
@@ -189,6 +199,120 @@ fn handles_non_json_error_body() {
 }
 
 #[test]
+fn summarizes_non_json_error_bodies() {
+    let page = format!(
+        "<html><head><title>502 Bad Gateway</title></head><body>{}</body></html>",
+        "<p>upstream failure</p>".repeat(1000)
+    );
+    let (_, message) = parse_api_error(502, page.as_bytes());
+    assert_eq!(message, "502 Bad Gateway");
+
+    let (_, message) = parse_api_error(502, b"<p>upstream\n  <b>failure</b></p>");
+    assert_eq!(message, "upstream failure");
+
+    let (_, message) = parse_api_error(502, "x".repeat(10_000).as_bytes());
+    assert_eq!(message, format!("{}…", "x".repeat(200)));
+}
+
+#[test]
+fn reads_label_values_it_does_not_know() {
+    let response = json_response(
+        "HTTP/1.1 200 OK",
+        r#"{"labels":[{"id":"Label_1","name":"todo","type":"shared","messageListVisibility":"dim","labelListVisibility":"labelShowIfStarred"}]}"#,
+    );
+    let mut coroutine = GmailLabelsList::new(&auth(), "me").unwrap();
+    let (ret, _) = run(&mut coroutine, &response);
+    let label = &ret.unwrap().response.labels[0];
+
+    assert_eq!(label.id, "Label_1");
+    assert_eq!(label.label_type, Some(GmailLabelType::Unknown));
+    assert_eq!(
+        label.message_list_visibility,
+        Some(GmailMessageListVisibility::Unknown)
+    );
+    assert_eq!(
+        label.label_list_visibility,
+        Some(GmailLabelListVisibility::Unknown)
+    );
+}
+
+#[test]
+fn reads_setting_values_it_does_not_know() {
+    let forwarding = r#"{"enabled":true,"disposition":"snooze"}"#;
+    let forwarding: GmailAutoForwarding = serde_json::from_str(forwarding).unwrap();
+    assert_eq!(forwarding.disposition, Some(GmailDisposition::Unknown));
+
+    let imap = r#"{"enabled":true,"expungeBehavior":"shred"}"#;
+    let imap: GmailImapSettings = serde_json::from_str(imap).unwrap();
+    assert_eq!(imap.expunge_behavior, Some(GmailExpungeBehavior::Unknown));
+
+    let pop = r#"{"accessWindow":"lastWeek","disposition":"snooze"}"#;
+    let pop: GmailPopSettings = serde_json::from_str(pop).unwrap();
+    assert_eq!(pop.access_window, Some(GmailPopAccessWindow::Unknown));
+    assert_eq!(pop.disposition, Some(GmailDisposition::Unknown));
+
+    let address = r#"{"forwardingEmail":"a@example.com","verificationStatus":"revoked"}"#;
+    let address: GmailForwardingAddress = serde_json::from_str(address).unwrap();
+    assert_eq!(
+        address.verification_status,
+        Some(GmailVerificationStatus::Unknown)
+    );
+
+    let send_as = r#"{"sendAsEmail":"a@example.com","smtpMsa":{"host":"smtp.example.com","port":587,"securityMode":"quic"}}"#;
+    let send_as: GmailSendAs = serde_json::from_str(send_as).unwrap();
+    assert_eq!(
+        send_as.smtp_msa.unwrap().security_mode,
+        Some(GmailSecurityMode::Unknown)
+    );
+
+    let filter = r#"{"id":"f1","criteria":{"size":10,"sizeComparison":"equal"}}"#;
+    let filter: GmailFilter = serde_json::from_str(filter).unwrap();
+    assert_eq!(
+        filter.criteria.unwrap().size_comparison,
+        Some(GmailFilterSizeComparison::Unknown)
+    );
+}
+
+#[test]
+fn refuses_to_write_back_a_value_it_does_not_know() {
+    let label = GmailLabel {
+        id: "Label_1".into(),
+        name: "todo".into(),
+        label_list_visibility: Some(GmailLabelListVisibility::Unknown),
+        ..Default::default()
+    };
+    let result = GmailLabelUpdate::new(&auth(), "me", &label);
+
+    assert!(matches!(result, Err(GmailSendError::SerializeRequest(_))));
+}
+
+#[test]
+fn keeps_the_delay_to_retry_after() {
+    let status = "HTTP/1.1 429 Too Many Requests";
+    let plain = br#"{"error":{"code":429,"message":"slow down"}}"#;
+    let info = br#"{"error":{"code":429,"message":"slow down","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"1.5s"}]}}"#;
+    let retry_after = |headers: &[(&str, &str)], body: &[u8]| {
+        api_error(&http_response(status, headers, body)).retry_after()
+    };
+
+    assert_eq!(retry_after(&[], plain), None);
+    assert_eq!(
+        retry_after(&[("Retry-After", "120")], plain),
+        Some(Duration::from_secs(120))
+    );
+    assert_eq!(retry_after(&[], info), Some(Duration::from_millis(1500)));
+    assert_eq!(
+        retry_after(&[("Retry-After", "7")], info),
+        Some(Duration::from_secs(7))
+    );
+
+    // NOTE: the date form of the header is not read.
+    let date = [("Retry-After", "Fri, 13 Nov 2026 10:00:00 GMT")];
+    assert_eq!(retry_after(&date, plain), None);
+    assert_eq!(retry_after(&date, info), Some(Duration::from_millis(1500)));
+}
+
+#[test]
 fn round_trips_raw_messages() {
     let raw = b"Subject: test\r\n\r\nhello";
     assert_eq!(decode_raw(&encode_raw(raw)).unwrap(), raw);
@@ -228,7 +352,7 @@ fn serializes_params_into_query_pairs() {
         include_spam_trash: false,
     };
 
-    let pairs = to_query_pairs(&params);
+    let pairs = to_query_pairs(&params).unwrap();
 
     // NOTE: None and the false flag vanish; the slice expands into
     // one repeated key per element; field names come from the serde
@@ -242,6 +366,29 @@ fn serializes_params_into_query_pairs() {
             ("maxResults".to_string(), "10".to_string()),
         ],
     );
+}
+
+#[test]
+fn refuses_params_it_cannot_flatten() {
+    #[derive(serde::Serialize)]
+    struct Nested {
+        q: &'static str,
+    }
+
+    #[derive(serde::Serialize)]
+    struct Params {
+        q: &'static str,
+        nested: Nested,
+    }
+
+    let params = Params {
+        q: "is:unread",
+        nested: Nested { q: "is:read" },
+    };
+
+    assert!(to_query_pairs(&params).is_err());
+    assert!(to_query_pairs("is:unread").is_err());
+    assert!(to_field_pairs("q", &params).is_err());
 }
 
 fn api_error(response: &[u8]) -> GmailSendError {

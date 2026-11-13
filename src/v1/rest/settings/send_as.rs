@@ -86,4 +86,7 @@ pub enum GmailSecurityMode {
     Ssl,
     /// Communication upgraded to a secure channel using STARTTLS.
     Starttls,
+    /// A value this crate does not know: read, never written back.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }

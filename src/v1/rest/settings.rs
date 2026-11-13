@@ -126,6 +126,9 @@ pub enum GmailDisposition {
     Trash,
     /// Leave the message in the inbox but mark it as read.
     MarkRead,
+    /// A value this crate does not know: read, never written back.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }
 
 /// Behavior applied to messages expunged from an IMAP folder.
@@ -140,6 +143,9 @@ pub enum GmailExpungeBehavior {
     Trash,
     /// Immediately and permanently delete messages marked as deleted.
     DeleteForever,
+    /// A value this crate does not know: read, never written back.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }
 
 /// Range of messages accessible through POP.
@@ -154,6 +160,9 @@ pub enum GmailPopAccessWindow {
     FromNowOn,
     /// All unfetched messages are accessible via POP.
     AllMail,
+    /// A value this crate does not know: read, never written back.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }
 
 /// Verification state of an email address owned by a Gmail account.
@@ -171,4 +180,7 @@ pub enum GmailVerificationStatus {
     Rejected,
     /// The verification request expired without a response.
     Expired,
+    /// A value this crate does not know: read, never written back.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }

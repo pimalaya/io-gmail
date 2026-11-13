@@ -19,19 +19,23 @@ use serde::{
     ser::{Error as SerError, Impossible, SerializeSeq, SerializeStruct},
 };
 
-/// Serialize `value` into a list of URL query `(key, value)` pairs.
-pub fn to_query_pairs<T>(value: &T) -> Vec<(String, String)>
+/// Serialize `value` into a list of URL query `(key, value)` pairs,
+/// failing on a value that is not a flat struct.
+pub fn to_query_pairs<T>(value: &T) -> Result<Vec<(String, String)>, GmailQueryError>
 where
     T: Serialize + ?Sized,
 {
-    value.serialize(QuerySerializer).unwrap_or_default()
+    value.serialize(QuerySerializer)
 }
 
 /// Serialize a single field `value` into URL query pairs under `key`.
 ///
 /// Same rules as a struct field of [`to_query_pairs`]: `None` produces
 /// nothing and a unit enum variant produces its serde-renamed name.
-pub fn to_field_pairs<T>(key: &'static str, value: &T) -> Vec<(String, String)>
+pub fn to_field_pairs<T>(
+    key: &'static str,
+    value: &T,
+) -> Result<Vec<(String, String)>, GmailQueryError>
 where
     T: Serialize + ?Sized,
 {
@@ -41,10 +45,8 @@ where
         pairs: &mut pairs,
     };
 
-    match value.serialize(field) {
-        Ok(()) => pairs,
-        Err(_) => Vec::new(),
-    }
+    value.serialize(field)?;
+    Ok(pairs)
 }
 
 /// Predicate for `#[serde(skip_serializing_if = ...)]` on bool flags that

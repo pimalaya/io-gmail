@@ -208,6 +208,9 @@ pub enum GmailMessageListVisibility {
     Show,
     /// Messages with the label are hidden from the message list.
     Hide,
+    /// A value this crate does not know: read, never written back.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }
 
 /// Source of the internal date when importing or inserting a message

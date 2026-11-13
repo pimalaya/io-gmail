@@ -5,6 +5,8 @@
 
 mod common;
 
+use std::time::Duration;
+
 use io_gmail::v1::{
     batch::{
         GMAIL_BATCH_MAX_REQUESTS, GmailBatch, GmailBatchRequest, GmailBatchResponse,
@@ -432,6 +434,28 @@ fn stops_reading_parts_past_twice_the_calls() {
         responses[0].result,
         Err(GmailBatchResponseError::Missing)
     ));
+}
+
+#[test]
+fn keeps_each_call_retry_delay() {
+    let requests = [metadata_get("n1"), metadata_get("n2")];
+    let throttled = error_json(429, "Too many requests", "rateLimitExceeded", "UNAVAILABLE");
+    let body = [
+        batch_part(
+            BOUNDARY,
+            "n1",
+            "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 30",
+            &throttled,
+        ),
+        batch_part(BOUNDARY, "n2", "HTTP/1.1 429 Too Many Requests", &throttled),
+        close(),
+    ]
+    .concat();
+    let (responses, _) = run_batch(&requests, &body);
+    let retry_after = |i: usize| responses[i].result.as_ref().unwrap_err().retry_after();
+
+    assert_eq!(retry_after(0), Some(Duration::from_secs(30)));
+    assert_eq!(retry_after(1), None);
 }
 
 #[test]

@@ -28,3 +28,11 @@ Every coroutine SHALL refuse a bearer token holding a control character (CR, LF,
 - GIVEN a token ending with a line feed
 - WHEN `GmailProfileGet` is built with it
 - THEN it fails with `InvalidRequest` and no request is written
+
+### Requirement: Query parameters are written whole or the request is refused
+`to_query_pairs` and `to_field_pairs` SHALL fail with `GmailQueryError` on a value they cannot flatten (anything but a flat struct of scalars, options and sequences), and SHALL NOT return the pairs gathered before the failure. A coroutine SHALL return that failure as `GmailSendError::InvalidRequest` and SHALL NOT send the request without its parameters.
+
+#### Scenario: A params struct holding a nested struct
+- GIVEN a params struct with a scalar field and a nested struct field
+- WHEN `to_query_pairs` serializes it
+- THEN it fails, where it returned no pair at all before

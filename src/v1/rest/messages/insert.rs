@@ -40,7 +40,7 @@ impl GmailMessageInsert {
         {
             let mut query = url.query_pairs_mut();
 
-            query.extend_pairs(to_field_pairs("internalDateSource", &internal_date_source));
+            query.extend_pairs(to_field_pairs("internalDateSource", &internal_date_source)?);
 
             if deleted {
                 query.append_pair("deleted", "true");

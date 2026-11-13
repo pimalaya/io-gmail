@@ -88,4 +88,7 @@ pub enum GmailFilterSizeComparison {
     Smaller,
     /// Matches messages larger than the given size.
     Larger,
+    /// A value this crate does not know: read, never written back.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }

@@ -80,6 +80,9 @@ pub enum GmailLabelListVisibility {
     LabelShowIfUnread,
     /// The label never shows in the label list.
     LabelHide,
+    /// A value this crate does not know: read, never written back.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }
 
 /// Owner of the label: created by Gmail or by the user.
@@ -91,4 +94,7 @@ pub enum GmailLabelType {
     System,
     /// A label created by the user.
     User,
+    /// A value this crate does not know: read, never written back.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }

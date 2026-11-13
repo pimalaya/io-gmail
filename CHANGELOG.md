@@ -29,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `GMAIL_HISTORY_POLL_MAX_PAGES`, the number of `users.history.list` pages a tick reads at most.
 
+- Added an `Unknown` variant to `GmailLabelType`, `GmailLabelListVisibility`, `GmailMessageListVisibility`, `GmailDisposition`, `GmailExpungeBehavior`, `GmailPopAccessWindow`, `GmailVerificationStatus`, `GmailSecurityMode` and `GmailFilterSizeComparison`. **Breaking change.**
+
+  A value this crate does not know reads as `Unknown`, where it failed the whole response. Serializing `Unknown` fails, so it is never written back.
+
+- Added `GmailApiError::retry_after`, the delay the server asked for: the `Retry-After` header in its seconds form, else the `retryDelay` of `google.rpc.RetryInfo`. **Breaking change.**
+
+  A `GmailApiError` built as a struct literal needs the new field.
+
+- Added `GmailSendError::retry_after` and `GmailBatchResponseError::retry_after`, the latter reading the header of the call's own answer.
+
 ### Changed
 
 - Changed `GmailSend::get`, `GmailSend::delete` and `GmailSend::with_method` to return a `Result`. **Breaking change.**
@@ -44,6 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It used to report the diff without the message and move its cursor past it. Only a message gone since its listing (404) is still skipped.
 
 - Changed `GmailHistoryPoll` to complete with `GmailHistoryPollError::Completed` when resumed after completion, where it panicked.
+
+- Changed `to_query_pairs` and `to_field_pairs` to return a `Result`. **Breaking change.**
+
+  A value that is not flat fails with `GmailQueryError`, which the coroutines return as `GmailSendError::InvalidRequest`. The request used to go out without its parameters.
+
+- Changed the message of an error whose body is not Gmail's JSON envelope to a summary of at most 200 characters. **Behaviour change.**
+
+  It is the `title` of an HTML page, else its text without markup; it used to be the whole body.
 
 ### Fixed
 
@@ -62,6 +80,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `GmailHistoryPoll` listing from an empty cursor when the profile carries no history id: it now completes with `GmailHistoryPollError::MissingHistoryId`.
 
 - Fixed `GmailHistoryPoll` following page tokens without end: a tick stops at `GMAIL_HISTORY_POLL_MAX_PAGES` pages or on a repeated token.
+
+- Fixed the receive buffer staying allocated while a response body is parsed.
+
+  A raw message is held twice at peak while it is read, where it was held three times.
 
 ## [0.6.0] - 2026-11-04
 
