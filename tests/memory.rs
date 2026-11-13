@@ -9,10 +9,13 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use io_gmail::v1::rest::messages::{GmailMessageFormat, get::GmailMessageGet};
+use io_gmail::{
+    coroutine::*,
+    v1::rest::messages::{GmailMessageFormat, get::GmailMessageGet},
+};
 use io_http::rfc6750::bearer::HttpAuthBearer;
 
-use common::{json_response, run};
+use common::json_response;
 
 static LIVE: AtomicUsize = AtomicUsize::new(0);
 static PEAK: AtomicUsize = AtomicUsize::new(0);
@@ -38,6 +41,9 @@ unsafe impl GlobalAlloc for Counting {
 #[global_allocator]
 static ALLOCATOR: Counting = Counting;
 
+/// Size of a read of the std client, and of a TLS record.
+const READ_LEN: usize = 16 * 1024;
+
 #[test]
 fn reads_a_raw_message_within_twice_its_size() {
     const RAW_LEN: usize = 4 * 1024 * 1024;
@@ -47,21 +53,45 @@ fn reads_a_raw_message_within_twice_its_size() {
     drop(body);
 
     let auth = HttpAuthBearer::new("fake-token");
-    let mut coroutine =
-        GmailMessageGet::new(&auth, "me", "m1", GmailMessageFormat::Raw, &[]).unwrap();
 
-    let before = LIVE.load(Ordering::Relaxed);
-    PEAK.store(before, Ordering::Relaxed);
+    // NOTE: read by read as a stream gives it, then in one piece.
+    for read_len in [READ_LEN, response.len()] {
+        let mut coroutine =
+            GmailMessageGet::new(&auth, "me", "m1", GmailMessageFormat::Raw, &[]).unwrap();
 
-    let (ret, _) = run(&mut coroutine, &response);
-    let peak = PEAK.load(Ordering::Relaxed) - before;
+        let before = LIVE.load(Ordering::Relaxed);
+        PEAK.store(before, Ordering::Relaxed);
 
-    assert_eq!(ret.unwrap().response.raw.unwrap().len(), RAW_LEN);
+        let ret = read(&mut coroutine, &response, read_len);
+        let peak = PEAK.load(Ordering::Relaxed) - before;
 
-    // NOTE: twice is the receive buffer beside the body it is copied
-    // to, then the body beside the message parsed from it.
-    assert!(
-        peak < RAW_LEN * 5 / 2,
-        "peak of {peak} bytes for a raw message of {RAW_LEN}"
-    );
+        assert_eq!(ret.unwrap().response.raw.unwrap().len(), RAW_LEN);
+
+        // NOTE: twice is the body beside the message parsed from it.
+        assert!(
+            peak < RAW_LEN * 2 + 64 * 1024,
+            "peak of {peak} bytes for a raw message of {RAW_LEN} read by {read_len}"
+        );
+    }
+}
+
+/// Runs the coroutine to completion, feeding it the response by reads
+/// of `read_len` bytes at most.
+fn read<C: GmailCoroutine<Yield = GmailYield>>(
+    coroutine: &mut C,
+    response: &[u8],
+    read_len: usize,
+) -> C::Return {
+    let mut reads = response.chunks(read_len);
+    let mut arg: Option<&[u8]> = None;
+
+    loop {
+        match coroutine.resume(arg.take()) {
+            GmailCoroutineState::Complete(ret) => return ret,
+            GmailCoroutineState::Yielded(GmailYield::WantsWrite(_)) => {}
+            GmailCoroutineState::Yielded(GmailYield::WantsRead) => {
+                arg = Some(reads.next().unwrap_or(&[]));
+            }
+        }
+    }
 }

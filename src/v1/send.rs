@@ -15,6 +15,7 @@ use alloc::{
 
 use io_http::{
     coroutine::*,
+    rfc3986::path::{HttpUrlBuildError, http_url_build},
     rfc6750::bearer::HttpAuthBearer,
     rfc9110::{
         request::HttpRequest,
@@ -37,24 +38,14 @@ pub const GMAIL_API_BASE: &str = "https://gmail.googleapis.com/gmail/v1/";
 /// percent-encoded as a single path segment, so an id holding `/`, `?` or
 /// `#` cannot reach another resource.
 ///
-/// An empty, `.` or `..` segment names no resource and is refused.
+/// A segment the URL would drop or resolve names no resource and is
+/// refused: an empty one, `.`, `..`, or one holding a tab or a line
+/// break.
 pub fn gmail_api_url(segments: &[&str]) -> Result<Url, GmailSendError> {
-    for segment in segments {
-        if matches!(*segment, "" | "." | "..") {
-            return Err(GmailSendError::InvalidRequest(format!(
-                "Path segment `{segment}` names no resource"
-            )));
-        }
-    }
-
-    let mut url = Url::parse(GMAIL_API_BASE)?;
-
-    url.path_segments_mut()
-        .map_err(|()| GmailSendError::InvalidRequest(GMAIL_API_BASE.to_string()))?
-        .pop_if_empty()
-        .extend(segments);
-
-    Ok(url)
+    http_url_build(GMAIL_API_BASE, segments).map_err(|err| match err {
+        HttpUrlBuildError::InvalidBaseUrl(err, _) => GmailSendError::ParseUrl(err),
+        HttpUrlBuildError::InvalidSegment(_) => GmailSendError::InvalidRequest(err.to_string()),
+    })
 }
 
 /// Unit marker deserialized from empty 2xx bodies (DELETE, batch
@@ -557,6 +548,18 @@ mod tests {
     #[test]
     fn empty_and_dot_segments_are_refused() {
         for id in ["", ".", ".."] {
+            let result = gmail_api_url(&["users", "me", "labels", id]);
+
+            assert!(
+                matches!(result, Err(GmailSendError::InvalidRequest(_))),
+                "id {id:?} got: {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn segments_the_url_would_alter_are_refused() {
+        for id in [".\t.", "\n..", "Label\t_1", "Label_1\r\n"] {
             let result = gmail_api_url(&["users", "me", "labels", id]);
 
             assert!(

@@ -38,9 +38,9 @@ When a non-2xx body is not the JSON error envelope, the error message SHALL be m
 - THEN its message is `502 Bad Gateway`
 
 ### Requirement: The receive buffer is released before the body is parsed
-`GmailSend` SHALL drop the bytes buffered past the response, and the capacity that comes with them, before it parses the body, so that reading a response never holds more than the buffer beside the body, then the body beside the value parsed from it.
+`GmailSend` SHALL drop the bytes buffered past the response, and the capacity that comes with them, before it parses the body, so that reading a response answered with its length never holds more than twice its body: the body beside the value parsed from it. A body answered in several chunks is outside this bound.
 
 #### Scenario: A raw message of 4 MiB
-- GIVEN a `users.messages.get` answer whose `raw` field holds 4 MiB, read in one piece
+- GIVEN a `users.messages.get` answer whose `raw` field holds 4 MiB, read by 16 KiB or in one piece
 - WHEN `GmailMessageGet` completes
-- THEN the peak of live bytes it allocated stays under 10 MiB, where it reached 12 MiB before
+- THEN the peak of live bytes it allocated stays under 8 MiB and 64 KiB, where it reached 12 MiB read by 16 KiB before

@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Changed the io-http dependency to 0.7.
+
+  `GmailSendError::Send` carries io-http 0.7's `Http11SendError`, which fails with `InvalidRequest`, `UnsupportedTransferCoding` and `TooManyInterimResponses`. The `HttpAuthBearer` the coroutines take has no `Display`.
+
 - Changed `GmailSend::get`, `GmailSend::delete` and `GmailSend::with_method` to return a `Result`. **Breaking change.**
 
   They fail with `GmailSendError::InvalidRequest` on a bearer token holding a control character.
@@ -69,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed an empty, `.` or `..` id reaching the parent collection: `gmail_api_url` now refuses it with `GmailSendError::InvalidRequest`.
 
+- Fixed an id holding a tab or a line break reaching the resource named without it, or the parent collection for `.`, tab, `.`: `gmail_api_url` now refuses it with `GmailSendError::InvalidRequest`.
+
 - Fixed a bearer token holding a line break or another control character reaching the `Authorization` header: every coroutine now refuses it with `GmailSendError::InvalidRequest`.
 
 - Fixed `GmailBatchRequest::get` keeping the fragment of its URL in the inner request target.
@@ -83,7 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed the receive buffer staying allocated while a response body is parsed.
 
-  A raw message is held twice at peak while it is read, where it was held three times.
+  A raw message answered with its length is held twice at peak while it is read, where it was held three times.
 
 ## [0.6.0] - 2026-11-04
 
