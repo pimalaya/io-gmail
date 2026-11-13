@@ -95,12 +95,15 @@
 //! ## Watching a mailbox
 //!
 //! [`v1::history_poll::GmailHistoryPoll`] is the one composite,
-//! multi-step coroutine: an infinite watch that baselines the history
-//! cursor via `users.getProfile`, polls `users.history.list` on a timer
-//! and yields one Gmail-native diff per tick, re-baselining on an
-//! expired cursor. It is the polling alternative to `users.watch` and
-//! `users.stop` (Pub/Sub push), which exist as plain coroutines for API
-//! completeness but are not wired into a watcher.
+//! multi-step coroutine: an infinite watch that starts from the history
+//! cursor of `users.getProfile` or from a stored one, polls
+//! `users.history.list` on a timer and yields one Gmail-native diff per
+//! tick. On an expired cursor it starts over from the current one and
+//! says so, for the caller to resync in full; on an error it completes,
+//! to be resumed from the cursor of the last diff. It is the polling
+//! alternative to `users.watch` and `users.stop` (Pub/Sub push), which
+//! exist as plain coroutines for API completeness but are not wired
+//! into a watcher.
 //!
 //! ## Authentication
 //!

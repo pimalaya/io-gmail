@@ -25,7 +25,7 @@ This library is composed of 3 feature-gated layers:
 - **I/O-free coroutines**: state machines with no socket, no async runtime and no forced I/O model; run them from any blocking, async or test harness.
 - **Full Gmail REST API v1 surface**: labels, messages, drafts, threads, history, settings and push notification management (see [API coverage](#api-coverage)).
 - **Batching**: up to 100 read calls in one HTTP request (Google advises 50 or fewer for Gmail), each answer matched back to its call with its own result, so throttled calls are retried alone and gone messages dropped.
-- **Poll-based mailbox watching**: an infinite watch built on the history API, emitting one Gmail-native diff per tick and re-baselining itself on expired history cursors.
+- **Poll-based mailbox watching**: an infinite watch built on the history API, emitting one Gmail-native diff per tick, resuming from a stored history cursor and reporting an expired one.
 - **Bearer-token authentication**: requests carry the OAuth 2.0 access token you provide; minting and refreshing it stays under your control.
 - **Light client**: a standard, blocking client exposing one method per first-class verb over a stream you opened yourself (requires `client` feature).
 - **Full client** with **TLS** support:

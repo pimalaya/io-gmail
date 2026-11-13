@@ -663,6 +663,9 @@ fn history_poll(
                     Some(id) => removed = diff.removed.iter().any(|m| &m.id == id),
                 }
             }
+            GmailCoroutineState::Yielded(GmailHistoryPollYield::Expired(history_id)) => {
+                panic!("the history cursor expired, starting over from {history_id}");
+            }
         }
     }
 }

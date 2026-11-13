@@ -13,6 +13,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added a `batch` fuzz target, run from the `fuzz` devShell.
 
+- Added `GmailHistoryPoll::resume_from`, starting the watch from a stored history cursor.
+
+  Its first tick runs at once, without sleeping.
+
+- Added the public field `GmailHistoryPoll::auth`, the bearer of the requests the watch builds from then on.
+
+  Replacing it between ticks lets a watch outlive its access token.
+
+- Added `GmailHistoryPollYield::Expired`, yielded once the watch started over from the current history cursor because its own expired. **Breaking change.**
+
+  It carries the new cursor; the changes before it are lost and the caller resyncs in full. The watch used to start over without a word.
+
+- Added `GmailHistoryPollError::MissingHistoryId`, `TooManyPages`, `RepeatedPageToken` and `Completed`. **Breaking change.**
+
+- Added `GMAIL_HISTORY_POLL_MAX_PAGES`, the number of `users.history.list` pages a tick reads at most.
+
 ### Changed
 
 - Changed `GmailSend::get`, `GmailSend::delete` and `GmailSend::with_method` to return a `Result`. **Breaking change.**
@@ -22,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed `GmailBatch` to read at most twice as many answered parts as calls. **Behaviour change.**
 
   A call answered beyond that bound reads as `GmailBatchResponseError::Missing`.
+
+- Changed `GmailHistoryPoll` to complete with the error of a failed message fetch. **Behaviour change.**
+
+  It used to report the diff without the message and move its cursor past it. Only a message gone since its listing (404) is still skipped.
+
+- Changed `GmailHistoryPoll` to complete with `GmailHistoryPollError::Completed` when resumed after completion, where it panicked.
 
 ### Fixed
 
@@ -36,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GmailBatch` also refuses a request path holding `#`.
 
 - Fixed the batch answer parser listing every delimiter and part of the body before matching any: it now reads one part at a time, in a single pass over the lines.
+
+- Fixed `GmailHistoryPoll` listing from an empty cursor when the profile carries no history id: it now completes with `GmailHistoryPollError::MissingHistoryId`.
+
+- Fixed `GmailHistoryPoll` following page tokens without end: a tick stops at `GMAIL_HISTORY_POLL_MAX_PAGES` pages or on a repeated token.
 
 ## [0.6.0] - 2026-11-04
 
