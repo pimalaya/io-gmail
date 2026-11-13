@@ -2,16 +2,13 @@
 //!
 //! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.sendAs/delete>
 
-use alloc::format;
-
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::send::{GMAIL_API_BASE, GmailNoResponse, GmailSend, GmailSendError, GmailSendOutput},
+    v1::send::{GmailNoResponse, GmailSend, GmailSendError, GmailSendOutput, gmail_api_url},
 };
 
 /// I/O-free coroutine deleting a send-as alias from a Gmail account
@@ -30,8 +27,7 @@ impl GmailSendAsDelete {
         debug!("prepare gmail send-as alias deletion");
         trace!("send_as_email: {send_as_email:?}");
 
-        let url = Url::parse(GMAIL_API_BASE)?
-            .join(&format!("users/{user_id}/settings/sendAs/{send_as_email}"))?;
+        let url = gmail_api_url(&["users", user_id, "settings", "sendAs", send_as_email])?;
         let send = GmailSend::delete(auth, url);
 
         Ok(Self { send })

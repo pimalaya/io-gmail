@@ -2,8 +2,6 @@
 //!
 //! <https://developers.google.com/gmail/api/reference/rest/v1/users.messages/get>
 
-use alloc::format;
-
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
 use url::Url;
@@ -14,7 +12,7 @@ use crate::{
     v1::{
         query::to_field_pairs,
         rest::messages::{GmailMessage, GmailMessageFormat},
-        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+        send::{GmailSend, GmailSendError, GmailSendOutput, gmail_api_url},
     },
 };
 
@@ -53,8 +51,7 @@ impl GmailMessageGet {
         format: GmailMessageFormat,
         metadata_headers: &[&str],
     ) -> Result<Url, GmailSendError> {
-        let mut url =
-            Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/messages/{id}"))?;
+        let mut url = gmail_api_url(&["users", user_id, "messages", id])?;
 
         {
             let mut query = url.query_pairs_mut();

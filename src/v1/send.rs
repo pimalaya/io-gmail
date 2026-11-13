@@ -31,6 +31,20 @@ use crate::coroutine::*;
 /// Base URL of the Gmail REST API v1.
 pub const GMAIL_API_BASE: &str = "https://gmail.googleapis.com/gmail/v1/";
 
+/// The Gmail API URL of `segments` under [`GMAIL_API_BASE`], each one
+/// percent-encoded as a single path segment, so an id holding `/`, `?` or
+/// `#` cannot reach another resource.
+pub fn gmail_api_url(segments: &[&str]) -> Result<Url, GmailSendError> {
+    let mut url = Url::parse(GMAIL_API_BASE)?;
+
+    url.path_segments_mut()
+        .map_err(|()| GmailSendError::InvalidRequest(GMAIL_API_BASE.to_string()))?
+        .pop_if_empty()
+        .extend(segments);
+
+    Ok(url)
+}
+
 /// Unit marker deserialized from empty 2xx bodies (DELETE, batch
 /// operations, stop).
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
@@ -417,5 +431,22 @@ pub fn parse_api_error(http_status: u16, body: &[u8]) -> (u16, String) {
         (http_status, String::from("unknown Gmail API error"))
     } else {
         (http_status, message)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::v1::send::gmail_api_url;
+
+    #[test]
+    fn each_segment_stays_one_path_segment() {
+        let url = gmail_api_url(&["users", "me", "labels", "Label_1?x=1#f/../2"]).unwrap();
+
+        assert_eq!(
+            url.as_str(),
+            "https://gmail.googleapis.com/gmail/v1/users/me/labels/Label_1%3Fx=1%23f%2F..%2F2"
+        );
+        assert_eq!(url.query(), None);
+        assert_eq!(url.fragment(), None);
     }
 }

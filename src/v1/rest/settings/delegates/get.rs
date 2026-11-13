@@ -2,18 +2,15 @@
 //!
 //! <https://developers.google.com/gmail/api/reference/rest/v1/users.settings.delegates/get>
 
-use alloc::format;
-
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
     v1::{
         rest::settings::delegates::GmailDelegate,
-        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+        send::{GmailSend, GmailSendError, GmailSendOutput, gmail_api_url},
     },
 };
 
@@ -34,9 +31,7 @@ impl GmailDelegateGet {
         debug!("prepare gmail delegate retrieval");
         trace!("delegate_email: {delegate_email:?}");
 
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!(
-            "users/{user_id}/settings/delegates/{delegate_email}"
-        ))?;
+        let url = gmail_api_url(&["users", user_id, "settings", "delegates", delegate_email])?;
         let send = GmailSend::get(auth, url);
 
         Ok(Self { send })

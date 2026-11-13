@@ -2,16 +2,15 @@
 //!
 //! <https://developers.google.com/gmail/api/reference/rest/v1/users/stop>
 
-use alloc::{format, vec::Vec};
+use alloc::vec::Vec;
 
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::send::{GMAIL_API_BASE, GmailNoResponse, GmailSend, GmailSendError, GmailSendOutput},
+    v1::send::{GmailNoResponse, GmailSend, GmailSendError, GmailSendOutput, gmail_api_url},
 };
 
 /// I/O-free coroutine stopping Gmail push notifications (`users.stop`).
@@ -26,7 +25,7 @@ impl GmailStop {
         debug!("prepare gmail watch stop");
         trace!("user_id: {user_id:?}");
 
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/stop"))?;
+        let url = gmail_api_url(&["users", user_id, "stop"])?;
         let send = GmailSend::with_method(auth, "POST", url, None, Vec::new());
 
         Ok(Self { send })

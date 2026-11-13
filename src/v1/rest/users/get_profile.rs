@@ -2,17 +2,16 @@
 //!
 //! <https://developers.google.com/gmail/api/reference/rest/v1/users/getProfile>
 
-use alloc::{format, string::String};
+use alloc::string::String;
 
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+    v1::send::{GmailSend, GmailSendError, GmailSendOutput, gmail_api_url},
 };
 
 /// Aggregated mailbox profile of a Gmail user.
@@ -44,7 +43,7 @@ impl GmailProfileGet {
         debug!("prepare gmail profile retrieval");
         trace!("user_id: {user_id:?}");
 
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/profile"))?;
+        let url = gmail_api_url(&["users", user_id, "profile"])?;
         let send = GmailSend::get(auth, url);
 
         Ok(Self { send })

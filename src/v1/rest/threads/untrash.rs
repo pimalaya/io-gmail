@@ -2,18 +2,17 @@
 //!
 //! <https://developers.google.com/gmail/api/reference/rest/v1/users.threads/untrash>
 
-use alloc::{format, vec::Vec};
+use alloc::vec::Vec;
 
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
     v1::{
         rest::threads::GmailThread,
-        send::{GMAIL_API_BASE, GmailSend, GmailSendError, GmailSendOutput},
+        send::{GmailSend, GmailSendError, GmailSendOutput, gmail_api_url},
     },
 };
 
@@ -28,8 +27,7 @@ impl GmailThreadUntrash {
         debug!("prepare gmail thread untrashing");
         trace!("id: {id:?}");
 
-        let url =
-            Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/threads/{id}/untrash"))?;
+        let url = gmail_api_url(&["users", user_id, "threads", id, "untrash"])?;
         let send = GmailSend::with_method(auth, "POST", url, None, Vec::new());
 
         Ok(Self { send })

@@ -2,16 +2,13 @@
 //!
 //! <https://developers.google.com/gmail/api/reference/rest/v1/users.drafts/delete>
 
-use alloc::format;
-
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
-use url::Url;
 
 use crate::{
     coroutine::*,
     gmail_try,
-    v1::send::{GMAIL_API_BASE, GmailNoResponse, GmailSend, GmailSendError, GmailSendOutput},
+    v1::send::{GmailNoResponse, GmailSend, GmailSendError, GmailSendOutput, gmail_api_url},
 };
 
 /// Gmail REST draft deletion, yielding no response body.
@@ -25,7 +22,7 @@ impl GmailDraftDelete {
         debug!("prepare gmail draft deletion");
         trace!("id: {id:?}");
 
-        let url = Url::parse(GMAIL_API_BASE)?.join(&format!("users/{user_id}/drafts/{id}"))?;
+        let url = gmail_api_url(&["users", user_id, "drafts", id])?;
         let send = GmailSend::delete(auth, url);
 
         Ok(Self { send })

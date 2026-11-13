@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `gmail_api_url`, building a Gmail API URL from path segments.
+
+### Fixed
+
+- Fixed ids, label ids, attachment ids, user ids and email addresses going into request paths unencoded: each is now one percent-encoded path segment, so a `?`, `#`, `/` or `..` in it no longer cuts the path or reaches another resource.
+
 ## [0.6.0] - 2026-11-04
 
 ### Added
