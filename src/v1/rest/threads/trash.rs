@@ -28,7 +28,7 @@ impl GmailThreadTrash {
         trace!("id: {id:?}");
 
         let url = gmail_api_url(&["users", user_id, "threads", id, "trash"])?;
-        let send = GmailSend::with_method(auth, "POST", url, None, Vec::new());
+        let send = GmailSend::with_method(auth, "POST", url, None, Vec::new())?;
 
         Ok(Self { send })
     }

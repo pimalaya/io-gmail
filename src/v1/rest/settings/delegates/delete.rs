@@ -29,7 +29,7 @@ impl GmailDelegateDelete {
         trace!("delegate_email: {delegate_email:?}");
 
         let url = gmail_api_url(&["users", user_id, "settings", "delegates", delegate_email])?;
-        let send = GmailSend::delete(auth, url);
+        let send = GmailSend::delete(auth, url)?;
 
         Ok(Self { send })
     }

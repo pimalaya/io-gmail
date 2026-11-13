@@ -68,7 +68,7 @@ impl GmailHistoryList {
         let mut url = gmail_api_url(&["users", user_id, "history"])?;
         url.query_pairs_mut().extend_pairs(to_query_pairs(params));
 
-        let send = GmailSend::get(auth, url);
+        let send = GmailSend::get(auth, url)?;
 
         Ok(Self { send })
     }

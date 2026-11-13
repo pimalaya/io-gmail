@@ -26,7 +26,7 @@ impl GmailStop {
         trace!("user_id: {user_id:?}");
 
         let url = gmail_api_url(&["users", user_id, "stop"])?;
-        let send = GmailSend::with_method(auth, "POST", url, None, Vec::new());
+        let send = GmailSend::with_method(auth, "POST", url, None, Vec::new())?;
 
         Ok(Self { send })
     }

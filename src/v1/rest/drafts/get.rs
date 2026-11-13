@@ -39,7 +39,7 @@ impl GmailDraftGet {
             query.extend_pairs(to_field_pairs("format", &format));
         }
 
-        let send = GmailSend::get(auth, url);
+        let send = GmailSend::get(auth, url)?;
 
         Ok(Self { send })
     }

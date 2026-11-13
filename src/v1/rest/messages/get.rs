@@ -37,7 +37,7 @@ impl GmailMessageGet {
         trace!("id: {id:?}");
 
         let url = Self::url(user_id, id, format, metadata_headers)?;
-        let send = GmailSend::get(auth, url);
+        let send = GmailSend::get(auth, url)?;
 
         Ok(Self { send })
     }

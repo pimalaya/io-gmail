@@ -403,6 +403,38 @@ fn reads_any_get_call() {
 }
 
 #[test]
+fn drops_the_fragment_of_a_get_call() {
+    let url = Url::parse(GMAIL_API_BASE)
+        .unwrap()
+        .join("users/me/labels?fields=labels#frag")
+        .unwrap();
+    let request = GmailBatchRequest::get("label", &url);
+
+    assert_eq!(request.path, "/gmail/v1/users/me/labels?fields=labels");
+}
+
+#[test]
+fn stops_reading_parts_past_twice_the_calls() {
+    let requests = [metadata_get("j1")];
+    let stray = |id| batch_part(BOUNDARY, id, "HTTP/1.1 200 OK", "{}");
+    let answer = batch_part(BOUNDARY, "j1", "HTTP/1.1 200 OK", &message_json("j1", ""));
+
+    let body = [stray("x1"), answer.clone(), close()].concat();
+    let (responses, _) = run_batch(&requests, &body);
+
+    assert_eq!(responses[0].result.as_ref().unwrap().id, "j1");
+
+    let body = [stray("x1"), stray("x2"), answer, close()].concat();
+    let (responses, _) = run_batch(&requests, &body);
+
+    assert_eq!(responses[0].status, None);
+    assert!(matches!(
+        responses[0].result,
+        Err(GmailBatchResponseError::Missing)
+    ));
+}
+
+#[test]
 fn surfaces_outer_errors() {
     let response = json_response(
         "HTTP/1.1 401 Unauthorized",
@@ -456,4 +488,28 @@ fn refuses_invalid_batches() {
         path: "/gmail/v1/users/me/messages/h2 HTTP/1.1\r\nX-Injected: 1".into(),
     };
     assert!(invalid(new(&[bad_path])));
+}
+
+#[test]
+fn refuses_fragment_in_request_path() {
+    let request = GmailBatchRequest {
+        id: "k1".into(),
+        path: "/gmail/v1/users/me/messages/k1#frag".into(),
+    };
+    let result = GmailBatch::<GmailMessage>::new(&auth(), &[request]);
+
+    assert!(matches!(result, Err(GmailSendError::InvalidRequest(_))));
+}
+
+#[test]
+fn refuses_tokens_holding_control_characters() {
+    for token in ["fake\n", "fake\r\nX-Injected: 1"] {
+        let auth = HttpAuthBearer::new(token);
+        let result = GmailBatch::<GmailMessage>::new(&auth, &[metadata_get("l1")]);
+
+        assert!(
+            matches!(result, Err(GmailSendError::InvalidRequest(_))),
+            "token {token:?} reached the Authorization header"
+        );
+    }
 }

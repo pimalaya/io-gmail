@@ -37,7 +37,7 @@ impl GmailSendAsVerify {
             send_as_email,
             "verify",
         ])?;
-        let send = GmailSend::with_method(auth, "POST", url, None, Vec::new());
+        let send = GmailSend::with_method(auth, "POST", url, None, Vec::new())?;
 
         Ok(Self { send })
     }

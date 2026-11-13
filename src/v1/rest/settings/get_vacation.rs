@@ -27,7 +27,7 @@ impl GmailVacationGet {
         trace!("user_id: {user_id:?}");
 
         let url = gmail_api_url(&["users", user_id, "settings", "vacation"])?;
-        let send = GmailSend::get(auth, url);
+        let send = GmailSend::get(auth, url)?;
 
         Ok(Self { send })
     }

@@ -28,7 +28,7 @@ impl GmailSendAsDelete {
         trace!("send_as_email: {send_as_email:?}");
 
         let url = gmail_api_url(&["users", user_id, "settings", "sendAs", send_as_email])?;
-        let send = GmailSend::delete(auth, url);
+        let send = GmailSend::delete(auth, url)?;
 
         Ok(Self { send })
     }

@@ -85,7 +85,7 @@
 //! }
 //! ```
 
-use core::marker::PhantomData;
+use core::{iter, marker::PhantomData};
 
 use alloc::{
     format,
@@ -111,7 +111,7 @@ use crate::{
     coroutine::*,
     v1::{
         rest::messages::{GmailMessageFormat, get::GmailMessageGet},
-        send::{GmailApiError, GmailSendError, GmailSendOutput},
+        send::{GmailApiError, GmailSendError, GmailSendOutput, gmail_authorization},
     },
 };
 
@@ -130,6 +130,9 @@ const BOUNDARY: &str = "io_gmail_batch_5f0c2b8e7d4a";
 /// Prefix Google puts before the `Content-ID` of each answered part.
 const RESPONSE_ID_PREFIX: &str = "response-";
 
+/// Number of answered parts read per inner call before giving up.
+const MAX_PARTS_PER_REQUEST: usize = 2;
+
 /// One inner call of a batch: a `GET` on the Gmail API.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct GmailBatchRequest {
@@ -147,7 +150,7 @@ impl GmailBatchRequest {
     pub fn get(id: impl ToString, url: &Url) -> Self {
         Self {
             id: id.to_string(),
-            path: url[Position::BeforePath..].to_string(),
+            path: url[Position::BeforePath..Position::AfterQuery].to_string(),
         }
     }
 
@@ -278,11 +281,12 @@ impl<T: DeserializeOwned> GmailBatch<T> {
         body.extend_from_slice(format!("--{BOUNDARY}--\r\n").as_bytes());
 
         let host = url.host_str().unwrap_or("localhost").to_string();
+        let authorization = gmail_authorization(auth)?;
         let content_type = format!("multipart/mixed; boundary={BOUNDARY}");
 
         let mut request = HttpRequest::get(url)
             .header("Host", host)
-            .header("Authorization", auth.to_authorization())
+            .header("Authorization", authorization)
             .header("Content-Type", content_type)
             .body(body);
 
@@ -384,7 +388,9 @@ fn validate(requests: &[GmailBatchRequest]) -> Result<(), GmailSendError> {
 
         if !path.starts_with('/')
             || path.contains(BOUNDARY)
-            || path.chars().any(|c| c.is_whitespace() || c.is_control())
+            || path
+                .chars()
+                .any(|c| c.is_whitespace() || c.is_control() || c == '#')
         {
             return Err(GmailSendError::InvalidRequest(format!(
                 "Batch request path `{path}` is not a valid request target"
@@ -418,14 +424,21 @@ fn multipart_boundary(content_type: &str) -> Option<&str> {
 
 /// Matches the answered parts back to the requests by `Content-ID`,
 /// answering in the order of `ids`.
+///
+/// Reading stops once every id has its answer, or after
+/// [`MAX_PARTS_PER_REQUEST`] parts per id.
 fn parse_responses<T: DeserializeOwned>(
     ids: &[String],
     body: &[u8],
     boundary: &str,
 ) -> Vec<GmailBatchResponse<T>> {
     let mut answers: Vec<Option<(u16, &[u8])>> = ids.iter().map(|_| None).collect();
+    let mut unanswered = ids.len();
 
-    for part in split_parts(body, boundary) {
+    let delimiter = format!("--{boundary}");
+    let max_parts = ids.len() * MAX_PARTS_PER_REQUEST;
+
+    for part in split_parts(body, delimiter.as_bytes()).take(max_parts) {
         let (head, rest) = split_head(part);
 
         let Some(content_id) = header(head, "content-id") else {
@@ -457,6 +470,11 @@ fn parse_responses<T: DeserializeOwned>(
         };
 
         answers[i] = Some(answer);
+        unanswered -= 1;
+
+        if unanswered == 0 {
+            break;
+        }
     }
 
     ids.iter()
@@ -511,47 +529,31 @@ fn parse_inner_response(bytes: &[u8]) -> Option<(u16, &[u8])> {
     Some((status, body))
 }
 
-/// Splits a multipart body into the contents of its parts.
+/// Iterates the contents of the parts of a multipart body, one
+/// delimiter at a time.
 ///
 /// Delimiters are only recognised at the start of a line, the line
 /// break before each one belongs to it (RFC 2046 §5.1.1), and both CRLF
 /// and bare LF line breaks are accepted. A body missing its close
 /// delimiter ends its last part at the end of the body.
-fn split_parts<'a>(body: &'a [u8], boundary: &str) -> Vec<&'a [u8]> {
-    let delimiter = format!("--{boundary}");
-    let delimiter = delimiter.as_bytes();
+fn split_parts<'a>(body: &'a [u8], delimiter: &'a [u8]) -> impl Iterator<Item = &'a [u8]> {
+    let mut next = find_delimiter(body, delimiter, 0);
 
-    let mut starts = Vec::new();
-    let mut from = 0;
-
-    while let Some(offset) = find(&body[from..], delimiter) {
-        let pos = from + offset;
-
-        if pos == 0 || body[pos - 1] == b'\n' {
-            starts.push(pos);
-        }
-
-        from = pos + delimiter.len();
-    }
-
-    let mut parts = Vec::new();
-
-    for (n, &pos) in starts.iter().enumerate() {
-        let after = pos + delimiter.len();
+    iter::from_fn(move || {
+        let after = next.take()? + delimiter.len();
 
         if body[after..].starts_with(b"--") {
-            break;
+            return None;
         }
 
-        let Some(offset) = body[after..].iter().position(|&b| b == b'\n') else {
-            break;
-        };
-
+        let offset = body[after..].iter().position(|&b| b == b'\n')?;
         let content_start = after + offset + 1;
 
-        let content_end = match starts.get(n + 1) {
+        next = find_delimiter(body, delimiter, content_start);
+
+        let content_end = match next {
             None => body.len(),
-            Some(&next) => {
+            Some(next) => {
                 let mut end = next - 1;
                 if end > 0 && body[end - 1] == b'\r' {
                     end -= 1;
@@ -560,10 +562,20 @@ fn split_parts<'a>(body: &'a [u8], boundary: &str) -> Vec<&'a [u8]> {
             }
         };
 
-        parts.push(&body[content_start..content_end.max(content_start)]);
-    }
+        Some(&body[content_start..content_end.max(content_start)])
+    })
+}
 
-    parts
+/// Finds the first line opening with `delimiter`, from the line
+/// starting at `from`.
+fn find_delimiter(body: &[u8], delimiter: &[u8], mut from: usize) -> Option<usize> {
+    loop {
+        if body[from..].starts_with(delimiter) {
+            return Some(from);
+        }
+
+        from += body[from..].iter().position(|&b| b == b'\n')? + 1;
+    }
 }
 
 /// Splits a header block from what follows the first empty line.
@@ -598,11 +610,4 @@ fn header<'a>(head: &'a [u8], name: &str) -> Option<&'a str> {
         .filter_map(|line| line.split_once(':'))
         .find(|(key, _)| key.trim().eq_ignore_ascii_case(name))
         .map(|(_, value)| value.trim())
-}
-
-/// Finds the first occurrence of `needle` in `haystack`.
-fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|window| window == needle)
 }

@@ -49,7 +49,7 @@ impl GmailThreadGet {
             }
         }
 
-        let send = GmailSend::get(auth, url);
+        let send = GmailSend::get(auth, url)?;
 
         Ok(Self { send })
     }

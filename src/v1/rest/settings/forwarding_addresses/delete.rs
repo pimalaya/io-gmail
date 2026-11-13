@@ -36,7 +36,7 @@ impl GmailForwardingAddressDelete {
             "forwardingAddresses",
             forwarding_email,
         ])?;
-        let send = GmailSend::delete(auth, url);
+        let send = GmailSend::delete(auth, url)?;
 
         Ok(Self { send })
     }

@@ -98,6 +98,19 @@ fn rejects_empty_label_name() {
 }
 
 #[test]
+fn refuses_tokens_holding_control_characters() {
+    for token in ["fake\n", "fake\r\nX-Injected: 1", "fa\tke", "fa\u{7f}ke"] {
+        let auth = HttpAuthBearer::new(token);
+
+        let Err(GmailSendError::InvalidRequest(message)) = GmailProfileGet::new(&auth, "me") else {
+            panic!("token {token:?} reached the Authorization header");
+        };
+
+        assert!(!message.contains("fa"), "got: {message}");
+    }
+}
+
+#[test]
 fn updates_label_with_patch() {
     let response = json_response(
         "HTTP/1.1 200 OK",

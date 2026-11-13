@@ -33,7 +33,7 @@ impl GmailAttachmentGet {
         trace!("id: {id:?}");
 
         let url = gmail_api_url(&["users", user_id, "messages", message_id, "attachments", id])?;
-        let send = GmailSend::get(auth, url);
+        let send = GmailSend::get(auth, url)?;
 
         Ok(Self { send })
     }

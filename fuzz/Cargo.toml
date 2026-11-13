@@ -1,0 +1,25 @@
+[package]
+name = "io-gmail-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1", features = ["derive"] }
+io-gmail = { path = "..", default-features = false }
+io-http = { version = "0.6", default-features = false }
+libfuzzer-sys = "0.4"
+serde_json = "1"
+
+[[bin]]
+name = "batch"
+path = "fuzz_targets/batch.rs"
+test = false
+doc = false
+bench = false
+
+# Detach from the parent package so `cargo fuzz` builds this crate standalone.
+[workspace]

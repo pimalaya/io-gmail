@@ -32,7 +32,7 @@ impl GmailDelegateGet {
         trace!("delegate_email: {delegate_email:?}");
 
         let url = gmail_api_url(&["users", user_id, "settings", "delegates", delegate_email])?;
-        let send = GmailSend::get(auth, url);
+        let send = GmailSend::get(auth, url)?;
 
         Ok(Self { send })
     }

@@ -23,7 +23,7 @@ impl GmailDraftDelete {
         trace!("id: {id:?}");
 
         let url = gmail_api_url(&["users", user_id, "drafts", id])?;
-        let send = GmailSend::delete(auth, url);
+        let send = GmailSend::delete(auth, url)?;
 
         Ok(Self { send })
     }

@@ -23,7 +23,7 @@ impl GmailLabelDelete {
         trace!("id: {id:?}");
 
         let url = gmail_api_url(&["users", user_id, "labels", id])?;
-        let send = GmailSend::delete(auth, url);
+        let send = GmailSend::delete(auth, url)?;
 
         Ok(Self { send })
     }

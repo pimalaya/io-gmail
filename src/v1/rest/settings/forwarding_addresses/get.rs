@@ -38,7 +38,7 @@ impl GmailForwardingAddressGet {
             "forwardingAddresses",
             forwarding_email,
         ])?;
-        let send = GmailSend::get(auth, url);
+        let send = GmailSend::get(auth, url)?;
 
         Ok(Self { send })
     }

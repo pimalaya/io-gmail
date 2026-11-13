@@ -8,6 +8,7 @@
 use core::marker::PhantomData;
 
 use alloc::{
+    format,
     string::{String, ToString},
     vec::Vec,
 };
@@ -34,7 +35,17 @@ pub const GMAIL_API_BASE: &str = "https://gmail.googleapis.com/gmail/v1/";
 /// The Gmail API URL of `segments` under [`GMAIL_API_BASE`], each one
 /// percent-encoded as a single path segment, so an id holding `/`, `?` or
 /// `#` cannot reach another resource.
+///
+/// An empty, `.` or `..` segment names no resource and is refused.
 pub fn gmail_api_url(segments: &[&str]) -> Result<Url, GmailSendError> {
+    for segment in segments {
+        if matches!(*segment, "" | "." | "..") {
+            return Err(GmailSendError::InvalidRequest(format!(
+                "Path segment `{segment}` names no resource"
+            )));
+        }
+    }
+
     let mut url = Url::parse(GMAIL_API_BASE)?;
 
     url.path_segments_mut()
@@ -238,12 +249,12 @@ pub struct GmailSend<T> {
 
 impl<T: DeserializeOwned> GmailSend<T> {
     /// Builds a GET request against the given URL.
-    pub fn get(auth: &HttpAuthBearer, url: Url) -> Self {
+    pub fn get(auth: &HttpAuthBearer, url: Url) -> Result<Self, GmailSendError> {
         Self::with_method(auth, "GET", url, None, Vec::new())
     }
 
     /// Builds a DELETE request against the given URL.
-    pub fn delete(auth: &HttpAuthBearer, url: Url) -> Self {
+    pub fn delete(auth: &HttpAuthBearer, url: Url) -> Result<Self, GmailSendError> {
         Self::with_method(auth, "DELETE", url, None, Vec::new())
     }
 
@@ -254,13 +265,7 @@ impl<T: DeserializeOwned> GmailSend<T> {
         body: &B,
     ) -> Result<Self, GmailSendError> {
         let body = serde_json::to_vec(body).map_err(GmailSendError::SerializeRequest)?;
-        Ok(Self::with_method(
-            auth,
-            "POST",
-            url,
-            Some("application/json"),
-            body,
-        ))
+        Self::with_method(auth, "POST", url, Some("application/json"), body)
     }
 
     /// Builds a PUT request with the given value as JSON body.
@@ -270,13 +275,7 @@ impl<T: DeserializeOwned> GmailSend<T> {
         body: &B,
     ) -> Result<Self, GmailSendError> {
         let body = serde_json::to_vec(body).map_err(GmailSendError::SerializeRequest)?;
-        Ok(Self::with_method(
-            auth,
-            "PUT",
-            url,
-            Some("application/json"),
-            body,
-        ))
+        Self::with_method(auth, "PUT", url, Some("application/json"), body)
     }
 
     /// Builds a PATCH request with the given value as JSON body.
@@ -286,29 +285,26 @@ impl<T: DeserializeOwned> GmailSend<T> {
         body: &B,
     ) -> Result<Self, GmailSendError> {
         let body = serde_json::to_vec(body).map_err(GmailSendError::SerializeRequest)?;
-        Ok(Self::with_method(
-            auth,
-            "PATCH",
-            url,
-            Some("application/json"),
-            body,
-        ))
+        Self::with_method(auth, "PATCH", url, Some("application/json"), body)
     }
 
     /// Builds a request with an arbitrary method, content type and body.
+    ///
+    /// A token holding a control character is refused.
     pub fn with_method(
         auth: &HttpAuthBearer,
         method: &str,
         url: Url,
         content_type: Option<&str>,
         body: Vec<u8>,
-    ) -> Self {
+    ) -> Result<Self, GmailSendError> {
         let host = url.host_str().unwrap_or("localhost");
+        let authorization = gmail_authorization(auth)?;
 
         let mut request = HttpRequest::get(url.clone())
             .header("Host", host)
             .header("Accept", "application/json")
-            .header("Authorization", auth.to_authorization())
+            .header("Authorization", authorization)
             .body(body);
 
         if let Some(content_type) = content_type {
@@ -321,10 +317,10 @@ impl<T: DeserializeOwned> GmailSend<T> {
         trace!("method: {method}");
         trace!("url: {url}");
 
-        Self {
+        Ok(Self {
             state: State::Send(Http11Send::new(request)),
             _phantom: PhantomData,
-        }
+        })
     }
 }
 
@@ -434,9 +430,34 @@ pub fn parse_api_error(http_status: u16, body: &[u8]) -> (u16, String) {
     }
 }
 
+/// The `Authorization` header value of `auth`, refused when the token
+/// holds a control character.
+pub(crate) fn gmail_authorization(auth: &HttpAuthBearer) -> Result<String, GmailSendError> {
+    let authorization = auth.to_authorization();
+
+    if authorization.chars().any(char::is_control) {
+        let message = "Bearer token holds a control character";
+        return Err(GmailSendError::InvalidRequest(message.to_string()));
+    }
+
+    Ok(authorization)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::v1::send::gmail_api_url;
+    use crate::v1::send::{GmailSendError, gmail_api_url};
+
+    #[test]
+    fn empty_and_dot_segments_are_refused() {
+        for id in ["", ".", ".."] {
+            let result = gmail_api_url(&["users", "me", "labels", id]);
+
+            assert!(
+                matches!(result, Err(GmailSendError::InvalidRequest(_))),
+                "id {id:?} got: {result:?}"
+            );
+        }
+    }
 
     #[test]
     fn each_segment_stays_one_path_segment() {

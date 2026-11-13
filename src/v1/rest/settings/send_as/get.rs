@@ -31,7 +31,7 @@ impl GmailSendAsGet {
         trace!("send_as_email: {send_as_email:?}");
 
         let url = gmail_api_url(&["users", user_id, "settings", "sendAs", send_as_email])?;
-        let send = GmailSend::get(auth, url);
+        let send = GmailSend::get(auth, url)?;
 
         Ok(Self { send })
     }

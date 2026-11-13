@@ -11,9 +11,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `gmail_api_url`, building a Gmail API URL from path segments.
 
+- Added a `batch` fuzz target, run from the `fuzz` devShell.
+
+### Changed
+
+- Changed `GmailSend::get`, `GmailSend::delete` and `GmailSend::with_method` to return a `Result`. **Breaking change.**
+
+  They fail with `GmailSendError::InvalidRequest` on a bearer token holding a control character.
+
+- Changed `GmailBatch` to read at most twice as many answered parts as calls. **Behaviour change.**
+
+  A call answered beyond that bound reads as `GmailBatchResponseError::Missing`.
+
 ### Fixed
 
 - Fixed ids, label ids, attachment ids, user ids and email addresses going into request paths unencoded: each is now one percent-encoded path segment, so a `?`, `#`, `/` or `..` in it no longer cuts the path or reaches another resource.
+
+- Fixed an empty, `.` or `..` id reaching the parent collection: `gmail_api_url` now refuses it with `GmailSendError::InvalidRequest`.
+
+- Fixed a bearer token holding a line break or another control character reaching the `Authorization` header: every coroutine now refuses it with `GmailSendError::InvalidRequest`.
+
+- Fixed `GmailBatchRequest::get` keeping the fragment of its URL in the inner request target.
+
+  `GmailBatch` also refuses a request path holding `#`.
+
+- Fixed the batch answer parser listing every delimiter and part of the body before matching any: it now reads one part at a time, in a single pass over the lines.
 
 ## [0.6.0] - 2026-11-04
 
