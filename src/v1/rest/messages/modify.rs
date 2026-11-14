@@ -7,6 +7,7 @@ use alloc::string::String;
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
 use serde::Serialize;
+use url::Url;
 
 use crate::{
     coroutine::*,
@@ -16,13 +17,6 @@ use crate::{
         send::{GmailSend, GmailSendError, GmailSendOutput, gmail_api_url},
     },
 };
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GmailMessageModifyRequest<'a> {
-    add_label_ids: &'a [String],
-    remove_label_ids: &'a [String],
-}
 
 /// Gmail REST message label modification, wrapping the updated `GmailMessage`.
 pub struct GmailMessageModify {
@@ -46,20 +40,18 @@ impl GmailMessageModify {
         trace!("add_label_ids: {add_label_ids:?}");
         trace!("remove_label_ids: {remove_label_ids:?}");
 
-        if add_label_ids.is_empty() && remove_label_ids.is_empty() {
-            return Err(GmailSendError::InvalidRequest(String::from(
-                "Modify requires at least one label update",
-            )));
-        }
-
-        let url = gmail_api_url(&["users", user_id, "messages", id, "modify"])?;
-        let body = GmailMessageModifyRequest {
-            add_label_ids,
-            remove_label_ids,
-        };
+        let url = Self::url(user_id, id)?;
+        let body = GmailMessageModifyRequest::new(add_label_ids, remove_label_ids)?;
         let send = GmailSend::post_json(auth, url, &body)?;
 
         Ok(Self { send })
+    }
+
+    /// Builds the `users.messages.modify` URL, shared with the batched
+    /// form of the same call
+    /// ([`GmailBatchRequest::message_modify`](crate::v1::batch::GmailBatchRequest::message_modify)).
+    pub fn url(user_id: &str, id: &str) -> Result<Url, GmailSendError> {
+        gmail_api_url(&["users", user_id, "messages", id, "modify"])
     }
 }
 
@@ -72,5 +64,32 @@ impl GmailCoroutine for GmailMessageModify {
         debug!("message modified");
         trace!("out: {out:?}");
         GmailCoroutineState::Complete(Ok(out))
+    }
+}
+
+/// The JSON body of `users.messages.modify`.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GmailMessageModifyRequest<'a> {
+    add_label_ids: &'a [String],
+    remove_label_ids: &'a [String],
+}
+
+impl<'a> GmailMessageModifyRequest<'a> {
+    /// Builds the body, refusing two empty label lists.
+    pub(crate) fn new(
+        add_label_ids: &'a [String],
+        remove_label_ids: &'a [String],
+    ) -> Result<Self, GmailSendError> {
+        if add_label_ids.is_empty() && remove_label_ids.is_empty() {
+            return Err(GmailSendError::InvalidRequest(String::from(
+                "Modify requires at least one label update",
+            )));
+        }
+
+        Ok(Self {
+            add_label_ids,
+            remove_label_ids,
+        })
     }
 }

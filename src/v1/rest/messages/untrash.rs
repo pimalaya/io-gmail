@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
+use url::Url;
 
 use crate::{
     coroutine::*,
@@ -28,10 +29,17 @@ impl GmailMessageUntrash {
         debug!("prepare gmail message untrashing");
         trace!("id: {id:?}");
 
-        let url = gmail_api_url(&["users", user_id, "messages", id, "untrash"])?;
+        let url = Self::url(user_id, id)?;
         let send = GmailSend::with_method(auth, "POST", url, None, Vec::new())?;
 
         Ok(Self { send })
+    }
+
+    /// Builds the `users.messages.untrash` URL, shared with the batched
+    /// form of the same call
+    /// ([`GmailBatchRequest::message_untrash`](crate::v1::batch::GmailBatchRequest::message_untrash)).
+    pub fn url(user_id: &str, id: &str) -> Result<Url, GmailSendError> {
+        gmail_api_url(&["users", user_id, "messages", id, "untrash"])
     }
 }
 

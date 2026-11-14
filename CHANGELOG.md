@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added the public fields `GmailBatchRequest::method` and `GmailBatchRequest::body`. **Breaking change.**
+
+  A batch call is any `GET`, `POST`, `PUT`, `PATCH` or `DELETE`, with an optional JSON body refused on a `GET`. A `GmailBatchRequest` built as a struct literal needs the new fields, or `..Default::default()`, whose method is `GET`.
+
+- Added `GmailBatchRequest::message_modify`, the batched form of `users.messages.modify`.
+
+- Added `GmailBatchRequest::message_trash`, the batched form of `users.messages.trash`.
+
+- Added `GmailBatchRequest::message_untrash`, the batched form of `users.messages.untrash`.
+
+- Added `GmailBatchRequest::message_delete`, the batched form of `users.messages.delete`.
+
+- Added `GmailMessageModify::url`, `GmailMessageTrash::url`, `GmailMessageUntrash::url` and `GmailMessageDelete::url`.
+
 ## [0.8.0] - 2026-11-13
 
 ### Changed

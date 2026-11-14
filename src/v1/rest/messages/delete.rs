@@ -4,6 +4,7 @@
 
 use io_http::rfc6750::bearer::HttpAuthBearer;
 use log::{debug, trace};
+use url::Url;
 
 use crate::{
     coroutine::*,
@@ -23,10 +24,17 @@ impl GmailMessageDelete {
         debug!("prepare gmail message deletion");
         trace!("id: {id:?}");
 
-        let url = gmail_api_url(&["users", user_id, "messages", id])?;
+        let url = Self::url(user_id, id)?;
         let send = GmailSend::delete(auth, url)?;
 
         Ok(Self { send })
+    }
+
+    /// Builds the `users.messages.delete` URL, shared with the batched
+    /// form of the same call
+    /// ([`GmailBatchRequest::message_delete`](crate::v1::batch::GmailBatchRequest::message_delete)).
+    pub fn url(user_id: &str, id: &str) -> Result<Url, GmailSendError> {
+        gmail_api_url(&["users", user_id, "messages", id])
     }
 }
 

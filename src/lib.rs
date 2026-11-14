@@ -85,7 +85,7 @@
 //!
 //! ## Batching
 //!
-//! [`v1::batch::GmailBatch`] sends up to 100 `GET` calls in one
+//! [`v1::batch::GmailBatch`] sends up to 100 calls in one
 //! `multipart/mixed` request to Google's batch endpoint, and matches
 //! each inner answer back to its call by `Content-ID`. Each call keeps
 //! its own result: a parsed body, or its own error, so a caller retries

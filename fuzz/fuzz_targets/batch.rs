@@ -42,6 +42,7 @@ fuzz_target!(|input: Input| {
         .map(|i| GmailBatchRequest {
             id: format!("{i}"),
             path: format!("/gmail/v1/users/me/messages/{i}"),
+            ..Default::default()
         })
         .collect();
 

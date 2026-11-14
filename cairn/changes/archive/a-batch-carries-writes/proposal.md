@@ -1,7 +1,7 @@
 ---
 cairn: change
 id: a-batch-carries-writes
-status: active
+status: landed
 created: 2026-11-14
 ---
 

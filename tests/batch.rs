@@ -12,10 +12,11 @@ use io_gmail::v1::{
         GMAIL_BATCH_MAX_REQUESTS, GmailBatch, GmailBatchRequest, GmailBatchResponse,
         GmailBatchResponseError,
     },
-    rest::messages::{GmailMessage, GmailMessageFormat},
+    rest::messages::{GmailMessage, GmailMessageFormat, modify::GmailMessageModify},
     send::{GMAIL_API_BASE, GmailSendError},
 };
 use io_http::rfc6750::bearer::HttpAuthBearer;
+use serde_json::{Value, json};
 use url::Url;
 
 use common::{batch_part, batch_response, http_response, json_response, run};
@@ -79,6 +80,22 @@ fn close() -> String {
     format!("--{BOUNDARY}--\r\n")
 }
 
+/// Splits a written batch request into its multipart boundary and its body.
+fn split_written(written: &str) -> (&str, &str) {
+    let (head, body) = written.split_once("\r\n\r\n").unwrap();
+    let boundary = head
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.eq_ignore_ascii_case("content-type")
+                .then_some(value.trim())
+        })
+        .and_then(|value| value.strip_prefix("multipart/mixed; boundary="))
+        .expect("multipart content type");
+
+    (boundary, body)
+}
+
 fn run_batch(
     requests: &[GmailBatchRequest],
     body: &str,
@@ -126,16 +143,7 @@ fn writes_one_http_part_per_call() {
         "got: {written}"
     );
 
-    let (head, body) = written.split_once("\r\n\r\n").unwrap();
-    let boundary = head
-        .lines()
-        .find_map(|line| {
-            let (name, value) = line.split_once(':')?;
-            name.eq_ignore_ascii_case("content-type")
-                .then_some(value.trim())
-        })
-        .and_then(|value| value.strip_prefix("multipart/mixed; boundary="))
-        .expect("multipart content type");
+    let (boundary, body) = split_written(&written);
 
     let expected = format!(
         "--{boundary}\r\n\
@@ -504,12 +512,14 @@ fn refuses_invalid_batches() {
     let bad_id = GmailBatchRequest {
         id: "h<1>".into(),
         path: "/gmail/v1/users/me/messages/h1".into(),
+        ..Default::default()
     };
     assert!(invalid(new(&[bad_id])));
 
     let bad_path = GmailBatchRequest {
         id: "h2".into(),
         path: "/gmail/v1/users/me/messages/h2 HTTP/1.1\r\nX-Injected: 1".into(),
+        ..Default::default()
     };
     assert!(invalid(new(&[bad_path])));
 }
@@ -519,6 +529,7 @@ fn refuses_fragment_in_request_path() {
     let request = GmailBatchRequest {
         id: "k1".into(),
         path: "/gmail/v1/users/me/messages/k1#frag".into(),
+        ..Default::default()
     };
     let result = GmailBatch::<GmailMessage>::new(&auth(), &[request]);
 
@@ -536,4 +547,175 @@ fn refuses_tokens_holding_control_characters() {
             "token {token:?} reached the Authorization header"
         );
     }
+}
+
+fn message_writes() -> [GmailBatchRequest; 5] {
+    let starred = ["STARRED".to_string()];
+
+    [
+        GmailBatchRequest::message_modify("m1", "me", "m1", &starred, &[]).unwrap(),
+        GmailBatchRequest::message_delete("m2", "me", "m2").unwrap(),
+        GmailBatchRequest::message_delete("m3", "me", "m3").unwrap(),
+        GmailBatchRequest::message_trash("m4", "me", "m4").unwrap(),
+        GmailBatchRequest::message_untrash("m5", "me", "m5").unwrap(),
+    ]
+}
+
+#[test]
+fn writes_message_writes() {
+    let starred = ["STARRED".to_string()];
+    let mut modify = GmailMessageModify::new(&auth(), "me", "m1", &starred, &[]).unwrap();
+    let response = json_response("HTTP/1.1 200 OK", &message_json("m1", ""));
+    let (_, written) = run(&mut modify, &response);
+    let written = String::from_utf8(written).unwrap();
+    let (_, json) = written.split_once("\r\n\r\n").unwrap();
+
+    let mut coroutine = GmailBatch::<Value>::new(&auth(), &message_writes()).unwrap();
+    let (_, written) = run(&mut coroutine, &batch_response(BOUNDARY, &close()));
+    let written = String::from_utf8(written).unwrap();
+    let (boundary, body) = split_written(&written);
+
+    let len = json.len();
+    let expected = format!(
+        "--{boundary}\r\n\
+         Content-Type: application/http\r\n\
+         Content-ID: <m1>\r\n\
+         \r\n\
+         POST /gmail/v1/users/me/messages/m1/modify HTTP/1.1\r\n\
+         Content-Type: application/json\r\n\
+         Content-Length: {len}\r\n\
+         \r\n\
+         {json}\r\n\
+         --{boundary}\r\n\
+         Content-Type: application/http\r\n\
+         Content-ID: <m2>\r\n\
+         \r\n\
+         DELETE /gmail/v1/users/me/messages/m2 HTTP/1.1\r\n\
+         Content-Length: 0\r\n\
+         \r\n\
+         \r\n\
+         --{boundary}\r\n\
+         Content-Type: application/http\r\n\
+         Content-ID: <m3>\r\n\
+         \r\n\
+         DELETE /gmail/v1/users/me/messages/m3 HTTP/1.1\r\n\
+         Content-Length: 0\r\n\
+         \r\n\
+         \r\n\
+         --{boundary}\r\n\
+         Content-Type: application/http\r\n\
+         Content-ID: <m4>\r\n\
+         \r\n\
+         POST /gmail/v1/users/me/messages/m4/trash HTTP/1.1\r\n\
+         Content-Length: 0\r\n\
+         \r\n\
+         \r\n\
+         --{boundary}\r\n\
+         Content-Type: application/http\r\n\
+         Content-ID: <m5>\r\n\
+         \r\n\
+         POST /gmail/v1/users/me/messages/m5/untrash HTTP/1.1\r\n\
+         Content-Length: 0\r\n\
+         \r\n\
+         \r\n\
+         --{boundary}--\r\n"
+    );
+
+    assert_eq!(json, r#"{"addLabelIds":["STARRED"],"removeLabelIds":[]}"#);
+    assert_eq!(body, expected);
+}
+
+#[test]
+fn reads_an_answer_per_write() {
+    let not_found = error_json(
+        404,
+        "Requested entity was not found.",
+        "notFound",
+        "NOT_FOUND",
+    );
+    let body = [
+        batch_part(
+            BOUNDARY,
+            "m1",
+            "HTTP/1.1 200 OK",
+            &message_json("m1", r#""INBOX","STARRED""#),
+        ),
+        batch_part(BOUNDARY, "m2", "HTTP/1.1 404 Not Found", &not_found),
+        format!(
+            "--{BOUNDARY}\r\n\
+             Content-Type: application/http\r\n\
+             Content-ID: <response-m3>\r\n\
+             \r\n\
+             HTTP/1.1 204 No Content\r\n\
+             \r\n\
+             \r\n"
+        ),
+        batch_part(
+            BOUNDARY,
+            "m4",
+            "HTTP/1.1 200 OK",
+            &message_json("m4", r#""TRASH""#),
+        ),
+        batch_part(
+            BOUNDARY,
+            "m5",
+            "HTTP/1.1 200 OK",
+            &message_json("m5", r#""INBOX""#),
+        ),
+        close(),
+    ]
+    .concat();
+
+    let mut coroutine = GmailBatch::<Value>::new(&auth(), &message_writes()).unwrap();
+    let (ret, _) = run(&mut coroutine, &batch_response(BOUNDARY, &body));
+    let responses = ret.unwrap().response;
+
+    let statuses: Vec<_> = responses.iter().map(|r| r.status).collect();
+    assert_eq!(
+        statuses,
+        [Some(200), Some(404), Some(204), Some(200), Some(200)]
+    );
+
+    let labels = &responses[0].result.as_ref().unwrap()["labelIds"];
+    assert_eq!(*labels, json!(["INBOX", "STARRED"]));
+
+    let err = responses[1].result.as_ref().unwrap_err();
+    assert!(matches!(err, GmailBatchResponseError::Api(_)));
+    assert_eq!(err.status(), Some(404));
+    assert!(err.is_not_found());
+
+    assert_eq!(*responses[2].result.as_ref().unwrap(), json!({}));
+}
+
+#[test]
+fn refuses_invalid_write_calls() {
+    let new = |requests: &[GmailBatchRequest]| GmailBatch::<Value>::new(&auth(), requests);
+    let invalid = |result: Result<_, _>| matches!(result, Err(GmailSendError::InvalidRequest(_)));
+    let call = |method: &str, body: Option<&str>| GmailBatchRequest {
+        id: "w1".into(),
+        method: method.into(),
+        path: "/gmail/v1/users/me/messages/w1".into(),
+        body: body.map(|body| body.as_bytes().to_vec()),
+    };
+
+    for method in ["GET", "POST", "PUT", "PATCH", "DELETE"] {
+        assert!(new(&[call(method, None)]).is_ok(), "{method} refused");
+    }
+
+    for method in ["", "get", "HEAD", "OPTIONS", "POST /x HTTP/1.1\r\n"] {
+        assert!(invalid(new(&[call(method, None)])), "{method:?} accepted");
+    }
+
+    assert!(invalid(new(&[call("GET", Some("{}"))])));
+    assert!(new(&[call("DELETE", Some("{}"))]).is_ok());
+
+    let mut coroutine = new(&[call("PATCH", Some("{}"))]).unwrap();
+    let (_, written) = run(&mut coroutine, &batch_response(BOUNDARY, &close()));
+    let written = String::from_utf8(written).unwrap();
+    let (boundary, _) = split_written(&written);
+    let body = format!("{{\"name\":\"\r\n--{boundary}--\r\n\"}}");
+    assert!(invalid(new(&[call("PATCH", Some(&body))])));
+
+    let modify = GmailBatchRequest::message_modify("w2", "me", "w2", &[], &[]);
+    assert!(matches!(modify, Err(GmailSendError::InvalidRequest(_))));
 }

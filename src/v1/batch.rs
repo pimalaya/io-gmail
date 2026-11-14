@@ -16,11 +16,13 @@
 //! ([`GmailBatchResponseError::is_retryable`],
 //! [`GmailBatchResponseError::is_not_found`]).
 //!
-//! Inner calls are `GET` requests on the Gmail API, such as
-//! `users.messages.get` ([`GmailBatchRequest::message_get`]) or any URL
-//! built under [`GMAIL_API_BASE`](crate::v1::send::GMAIL_API_BASE)
-//! ([`GmailBatchRequest::get`]). The outer request carries the bearer
-//! token; inner calls inherit it.
+//! Inner calls are requests on the Gmail API: a `GET` on any URL built
+//! under [`GMAIL_API_BASE`](crate::v1::send::GMAIL_API_BASE)
+//! ([`GmailBatchRequest::get`]), the batched form of a message call such as
+//! `users.messages.get` ([`GmailBatchRequest::message_get`]) or
+//! `users.messages.modify` ([`GmailBatchRequest::message_modify`]), or any
+//! method, path and JSON body. The outer request carries the bearer token;
+//! inner calls inherit it.
 //!
 //! <https://developers.google.com/gmail/api/guides/batch>
 //!
@@ -110,7 +112,14 @@ use url::{Position, Url};
 use crate::{
     coroutine::*,
     v1::{
-        rest::messages::{GmailMessageFormat, get::GmailMessageGet},
+        rest::messages::{
+            GmailMessageFormat,
+            delete::GmailMessageDelete,
+            get::GmailMessageGet,
+            modify::{GmailMessageModify, GmailMessageModifyRequest},
+            trash::GmailMessageTrash,
+            untrash::GmailMessageUntrash,
+        },
         send::{GmailApiError, GmailSendError, GmailSendOutput, gmail_authorization, parse_delay},
     },
 };
@@ -133,15 +142,31 @@ const RESPONSE_ID_PREFIX: &str = "response-";
 /// Number of answered parts read per inner call before giving up.
 const MAX_PARTS_PER_REQUEST: usize = 2;
 
-/// One inner call of a batch: a `GET` on the Gmail API.
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
+/// One inner call of a batch: a request on the Gmail API.
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct GmailBatchRequest {
     /// The id correlating the call with its answer, unique within the
     /// batch; sent as the part's `Content-ID`.
     pub id: String,
+    /// The HTTP method of the call: `GET`, `POST`, `PUT`, `PATCH` or
+    /// `DELETE`.
+    pub method: String,
     /// The absolute path and query of the call, such as
     /// `/gmail/v1/users/me/messages/abc?format=metadata`.
     pub path: String,
+    /// The JSON body of the call, refused on a `GET`.
+    pub body: Option<Vec<u8>>,
+}
+
+impl Default for GmailBatchRequest {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            method: String::from("GET"),
+            path: String::new(),
+            body: None,
+        }
+    }
 }
 
 impl GmailBatchRequest {
@@ -150,7 +175,9 @@ impl GmailBatchRequest {
     pub fn get(id: impl ToString, url: &Url) -> Self {
         Self {
             id: id.to_string(),
+            method: String::from("GET"),
             path: url[Position::BeforePath..Position::AfterQuery].to_string(),
+            body: None,
         }
     }
 
@@ -168,6 +195,74 @@ impl GmailBatchRequest {
     ) -> Result<Self, GmailSendError> {
         let url = GmailMessageGet::url(user_id, message_id, format, metadata_headers)?;
         Ok(Self::get(id, &url))
+    }
+
+    /// Builds a `users.messages.modify` call, the batched form of
+    /// [`GmailMessageModify`].
+    ///
+    /// Fails with [`GmailSendError::InvalidRequest`] when both label
+    /// lists are empty.
+    pub fn message_modify(
+        id: impl ToString,
+        user_id: &str,
+        message_id: &str,
+        add_label_ids: &[String],
+        remove_label_ids: &[String],
+    ) -> Result<Self, GmailSendError> {
+        let url = GmailMessageModify::url(user_id, message_id)?;
+        let body = GmailMessageModifyRequest::new(add_label_ids, remove_label_ids)?;
+        let body = serde_json::to_vec(&body).map_err(GmailSendError::SerializeRequest)?;
+
+        Ok(Self {
+            method: String::from("POST"),
+            body: Some(body),
+            ..Self::get(id, &url)
+        })
+    }
+
+    /// Builds a `users.messages.trash` call, the batched form of
+    /// [`GmailMessageTrash`].
+    pub fn message_trash(
+        id: impl ToString,
+        user_id: &str,
+        message_id: &str,
+    ) -> Result<Self, GmailSendError> {
+        let url = GmailMessageTrash::url(user_id, message_id)?;
+
+        Ok(Self {
+            method: String::from("POST"),
+            ..Self::get(id, &url)
+        })
+    }
+
+    /// Builds a `users.messages.untrash` call, the batched form of
+    /// [`GmailMessageUntrash`].
+    pub fn message_untrash(
+        id: impl ToString,
+        user_id: &str,
+        message_id: &str,
+    ) -> Result<Self, GmailSendError> {
+        let url = GmailMessageUntrash::url(user_id, message_id)?;
+
+        Ok(Self {
+            method: String::from("POST"),
+            ..Self::get(id, &url)
+        })
+    }
+
+    /// Builds a `users.messages.delete` call, the batched form of
+    /// [`GmailMessageDelete`].
+    pub fn message_delete(
+        id: impl ToString,
+        user_id: &str,
+        message_id: &str,
+    ) -> Result<Self, GmailSendError> {
+        let url = GmailMessageDelete::url(user_id, message_id)?;
+
+        Ok(Self {
+            method: String::from("DELETE"),
+            ..Self::get(id, &url)
+        })
     }
 }
 
@@ -243,7 +338,8 @@ impl GmailBatchResponseError {
 /// answer into `T`.
 ///
 /// Every inner call shares the response type `T`; batch calls of
-/// different kinds with `serde_json::Value`.
+/// different kinds with `serde_json::Value`. An empty 2xx answer, such
+/// as the one of `users.messages.delete`, reads as `{}`.
 pub struct GmailBatch<T> {
     ids: Vec<String>,
     send: Http11Send,
@@ -281,7 +377,25 @@ impl<T: DeserializeOwned> GmailBatch<T> {
             body.extend_from_slice(format!("--{BOUNDARY}\r\n").as_bytes());
             body.extend_from_slice(b"Content-Type: application/http\r\n");
             body.extend_from_slice(format!("Content-ID: <{}>\r\n\r\n", request.id).as_bytes());
-            body.extend_from_slice(format!("GET {} HTTP/1.1\r\n\r\n\r\n", request.path).as_bytes());
+            body.extend_from_slice(
+                format!("{} {} HTTP/1.1\r\n", request.method, request.path).as_bytes(),
+            );
+
+            if request.body.is_some() {
+                body.extend_from_slice(b"Content-Type: application/json\r\n");
+            }
+
+            // A bodiless POST without a length gets a 411 from Google,
+            // so every write carries one, 0 when bodiless, as io-http
+            // sends a single call.
+            if request.method != "GET" {
+                let len = request.body.as_ref().map_or(0, Vec::len);
+                body.extend_from_slice(format!("Content-Length: {len}\r\n").as_bytes());
+            }
+
+            body.extend_from_slice(b"\r\n");
+            body.extend_from_slice(request.body.as_deref().unwrap_or_default());
+            body.extend_from_slice(b"\r\n");
         }
 
         body.extend_from_slice(format!("--{BOUNDARY}--\r\n").as_bytes());
@@ -372,8 +486,9 @@ struct InnerResponse<'a> {
     body: &'a [u8],
 }
 
-/// Refuses an empty or oversized batch, duplicate ids, and ids or paths
-/// that would break the multipart body.
+/// Refuses an empty or oversized batch, duplicate ids, unknown methods, a
+/// body on a `GET`, and ids, paths or bodies that would break the
+/// multipart body.
 fn validate(requests: &[GmailBatchRequest]) -> Result<(), GmailSendError> {
     if requests.is_empty() || requests.len() > GMAIL_BATCH_MAX_REQUESTS {
         return Err(GmailSendError::InvalidRequest(format!(
@@ -411,6 +526,33 @@ fn validate(requests: &[GmailBatchRequest]) -> Result<(), GmailSendError> {
         {
             return Err(GmailSendError::InvalidRequest(format!(
                 "Batch request path `{path}` is not a valid request target"
+            )));
+        }
+
+        let method = &request.method;
+
+        if !matches!(method.as_str(), "GET" | "POST" | "PUT" | "PATCH" | "DELETE") {
+            return Err(GmailSendError::InvalidRequest(format!(
+                "Batch request method `{method}` is not supported"
+            )));
+        }
+
+        let Some(json) = &request.body else {
+            continue;
+        };
+
+        if method == "GET" {
+            return Err(GmailSendError::InvalidRequest(format!(
+                "Batch request `{id}` cannot carry a body on a GET"
+            )));
+        }
+
+        if json
+            .windows(BOUNDARY.len())
+            .any(|window| window == BOUNDARY.as_bytes())
+        {
+            return Err(GmailSendError::InvalidRequest(format!(
+                "Batch request `{id}` body holds the multipart boundary"
             )));
         }
     }
