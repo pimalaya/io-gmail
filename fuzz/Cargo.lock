@@ -198,7 +198,7 @@ dependencies = [
 
 [[package]]
 name = "io-gmail"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "base64-codec",
  "io-http",
@@ -222,9 +222,9 @@ dependencies = [
 
 [[package]]
 name = "io-http"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d195f9fce7b6202be9ec43c8f93e057006ddd5c9223258789606839aea62182"
+checksum = "47ae262c265c95e13dc5dd88370d23b74f5e5b307d503ba208e0e6117ddfbd3e"
 dependencies = [
  "base64-codec",
  "httparse",
