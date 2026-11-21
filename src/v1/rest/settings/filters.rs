@@ -6,9 +6,13 @@ use alloc::{string::String, vec::Vec};
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "client")]
 pub mod create;
+#[cfg(feature = "client")]
 pub mod delete;
+#[cfg(feature = "client")]
 pub mod get;
+#[cfg(feature = "client")]
 pub mod list;
 
 /// Mail filter of a Gmail account.

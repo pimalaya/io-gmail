@@ -9,11 +9,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::v1::rest::messages::GmailMessage;
 
+#[cfg(feature = "client")]
 pub mod delete;
+#[cfg(feature = "client")]
 pub mod get;
+#[cfg(feature = "client")]
 pub mod list;
+#[cfg(feature = "client")]
 pub mod modify;
+#[cfg(feature = "client")]
 pub mod trash;
+#[cfg(feature = "client")]
 pub mod untrash;
 
 /// A Gmail thread resource.

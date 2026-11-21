@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: Renamed the `client` feature, which gated the blocking client, to `std`.
+
+  A consumer naming it moves to the new name:
+
+  ```toml
+  # before
+  io-gmail = { version = "0.9", default-features = false, features = ["client"] }
+  # after
+  io-gmail = { version = "0.10", default-features = false, features = ["std"] }
+  ```
+
+- **BREAKING**: Changed the `client` feature to gate the coroutines (`coroutine`, `v1::send`, `v1::query`, `v1::batch`, `v1::history_poll` and every method submodule of `v1::rest`) and the io-http, log, serde_json and url dependencies.
+
+  It is on by default and implied by `std` and the TLS features. A consumer turning default features off to drive the coroutines itself adds it:
+
+  ```toml
+  # before
+  io-gmail = { version = "0.9", default-features = false }
+  # after
+  io-gmail = { version = "0.10", default-features = false, features = ["client"] }
+  ```
+
+  The resource types of `v1::rest` stay compiled without it.
+
 ## [0.9.0] - 2026-11-15
 
 ### Added

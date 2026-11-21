@@ -8,11 +8,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::v1::rest::messages::GmailMessage;
 
+#[cfg(feature = "client")]
 pub mod create;
+#[cfg(feature = "client")]
 pub mod delete;
+#[cfg(feature = "client")]
 pub mod get;
+#[cfg(feature = "client")]
 pub mod list;
+#[cfg(feature = "client")]
 pub mod send;
+#[cfg(feature = "client")]
 pub mod update;
 
 /// Gmail REST draft resource (an id plus its draft message).

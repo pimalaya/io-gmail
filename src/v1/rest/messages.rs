@@ -9,17 +9,29 @@ use base64_codec::codec::{Base64Alphabet, Base64Codec};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+#[cfg(feature = "client")]
 pub mod attachments;
+#[cfg(feature = "client")]
 pub mod batch_delete;
+#[cfg(feature = "client")]
 pub mod batch_modify;
+#[cfg(feature = "client")]
 pub mod delete;
+#[cfg(feature = "client")]
 pub mod get;
+#[cfg(feature = "client")]
 pub mod import;
+#[cfg(feature = "client")]
 pub mod insert;
+#[cfg(feature = "client")]
 pub mod list;
+#[cfg(feature = "client")]
 pub mod modify;
+#[cfg(feature = "client")]
 pub mod send;
+#[cfg(feature = "client")]
 pub mod trash;
+#[cfg(feature = "client")]
 pub mod untrash;
 
 /// A Gmail message resource.

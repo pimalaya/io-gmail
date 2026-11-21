@@ -9,9 +9,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::v1::rest::settings::GmailVerificationStatus;
 
+#[cfg(feature = "client")]
 pub mod create;
+#[cfg(feature = "client")]
 pub mod delete;
+#[cfg(feature = "client")]
 pub mod get;
+#[cfg(feature = "client")]
 pub mod list;
 
 /// Delegate granted access to a Gmail account.

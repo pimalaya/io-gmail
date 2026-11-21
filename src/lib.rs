@@ -23,12 +23,14 @@
 //! The crate has two of the three standard Pimalaya layers; there is no
 //! CLI:
 //!
-//! 1. **I/O-free coroutines** (`no_std` core, always present): the whole
-//!    Gmail REST logic.
-//! 2. **Std client** ([`v1::client::GmailClientStd`], `client` feature):
-//!    a blocking pump over any stream, with `connect` opening the
-//!    TCP/TLS connection itself behind a TLS feature (`rustls-ring` by
-//!    default, `rustls-aws`, `native-tls`).
+//! 1. **I/O-free coroutines** (`client` feature, on by default, `no_std`):
+//!    the whole Gmail REST logic. Without it the crate keeps the
+//!    `no_std` resource types alone.
+//! 2. **Std client** ([`v1::client::GmailClientStd`], `std` feature,
+//!    implying `client`): a blocking pump over any stream, with
+//!    `connect` opening the TCP/TLS connection itself behind a TLS
+//!    feature (`rustls-ring` by default, `rustls-aws`, `native-tls`),
+//!    each implying `std`.
 //!
 //! ## Everything lives under v1
 //!
@@ -166,8 +168,9 @@
 //! ```
 
 extern crate alloc;
-#[cfg(feature = "client")]
+#[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "client")]
 pub mod coroutine;
 pub mod v1;

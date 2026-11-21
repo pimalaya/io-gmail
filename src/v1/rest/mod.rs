@@ -9,4 +9,5 @@ pub mod labels;
 pub mod messages;
 pub mod settings;
 pub mod threads;
+#[cfg(feature = "client")]
 pub mod users;

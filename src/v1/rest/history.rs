@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::v1::rest::messages::GmailMessage;
 
+#[cfg(feature = "client")]
 pub mod list;
 
 /// A Gmail history record resource.

@@ -9,11 +9,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::v1::rest::messages::GmailMessageListVisibility;
 
+#[cfg(feature = "client")]
 pub mod create;
+#[cfg(feature = "client")]
 pub mod delete;
+#[cfg(feature = "client")]
 pub mod get;
+#[cfg(feature = "client")]
 pub mod list;
+#[cfg(feature = "client")]
 pub mod patch;
+#[cfg(feature = "client")]
 pub mod update;
 
 /// A Gmail label resource.

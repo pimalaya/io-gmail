@@ -13,15 +13,25 @@ pub mod filters;
 pub mod forwarding_addresses;
 pub mod send_as;
 
+#[cfg(feature = "client")]
 pub mod get_auto_forwarding;
+#[cfg(feature = "client")]
 pub mod get_imap;
+#[cfg(feature = "client")]
 pub mod get_language;
+#[cfg(feature = "client")]
 pub mod get_pop;
+#[cfg(feature = "client")]
 pub mod get_vacation;
+#[cfg(feature = "client")]
 pub mod update_auto_forwarding;
+#[cfg(feature = "client")]
 pub mod update_imap;
+#[cfg(feature = "client")]
 pub mod update_language;
+#[cfg(feature = "client")]
 pub mod update_pop;
+#[cfg(feature = "client")]
 pub mod update_vacation;
 
 /// Auto-forwarding settings of a Gmail account.
