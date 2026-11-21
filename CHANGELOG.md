@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-21
+
 ### Changed
 
 - Moved to io-http 0.9; `client` enables `io-http/client`.
@@ -250,7 +252,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `v1::history_poll::GmailHistoryPoll`, a poll-based mailbox watch.
 - Added `GmailClientStd`, a std blocking client behind the `client` feature.
 
-[unreleased]: https://github.com/pimalaya/io-gmail/compare/v0.9.0..HEAD
+[unreleased]: https://github.com/pimalaya/io-gmail/compare/v0.10.0..HEAD
+[0.10.0]: https://github.com/pimalaya/io-gmail/compare/v0.9.0..v0.10.0
 [0.9.0]: https://github.com/pimalaya/io-gmail/compare/v0.8.0..v0.9.0
 [0.8.0]: https://github.com/pimalaya/io-gmail/compare/v0.7.0..v0.8.0
 [0.7.0]: https://github.com/pimalaya/io-gmail/compare/v0.6.0..v0.7.0
